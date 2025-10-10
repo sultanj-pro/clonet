@@ -1,0 +1,33 @@
+# Development Dockerfile for backend with Spark support
+FROM node:18-alpine
+
+# Install OpenJDK 11 for Spark
+RUN apk add --no-cache openjdk11-jre
+
+# Set JAVA_HOME
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+ENV PATH=$PATH:$JAVA_HOME/bin
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (including devDependencies for development)
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Create directories for Spark
+RUN mkdir -p /opt/spark/jars /opt/spark/warehouse
+
+# Download MySQL connector JAR
+RUN wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.1.0/mysql-connector-j-8.1.0.jar \
+    -O /opt/spark/jars/mysql-connector-java.jar
+
+# Expose port
+EXPOSE 5000
+
+# Start the development server with nodemon
+CMD ["npm", "run", "dev"]

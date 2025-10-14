@@ -17,3 +17,7 @@ export interface ApiError {
   message: string;
   error?: string;
 }
+
+export interface StorageConfig {
+  type: 'mysql' | 'parquet';
+}

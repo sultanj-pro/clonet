@@ -23,6 +23,7 @@ services:
       - "5000:5000"
     volumes:
       - ./backend:/app
+      - ./backend/data/parquet:/app/data/parquet
       - /app/node_modules
     environment:
       - NODE_ENV=development

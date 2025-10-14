@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const storageConfig = require('../config/storage');
+const mysqlService = require('../services/mysqlDataService');
+const parquetService = require('../services/parquetDataService');
+
+// Helper to get the appropriate data service
+const getDataService = () => {
+  return storageConfig.type === 'parquet' ? parquetService : mysqlService;
+};
 
 /**
  * @swagger

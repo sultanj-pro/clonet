@@ -1,4 +1,4 @@
-import { User, UserInput, ApiError } from '../types';
+import { User, UserInput, ApiError, StorageConfig } from '../types';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 

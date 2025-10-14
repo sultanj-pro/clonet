@@ -8,6 +8,33 @@
   color: white;
 }
 
+.App-nav {
+  margin-top: 15px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.nav-button {
+  background: none;
+  border: 2px solid transparent;
+  color: white;
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.nav-button:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.nav-button.active {
+  border-color: white;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 main {
   padding: 20px;
 }

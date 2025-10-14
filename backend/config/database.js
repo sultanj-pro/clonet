@@ -7,8 +7,8 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_NAME || 'clonet_db',
   connectionLimit: 10,
-  acquireTimeout: 60000,
-  timeout: 60000
+  connectTimeout: 60000,
+  waitForConnections: true
 };
 
 const pool = mysql.createPool(dbConfig);

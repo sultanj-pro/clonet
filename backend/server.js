@@ -9,6 +9,10 @@ const { swaggerUi, specs } = require('./config/swagger');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Import routes
+const userRoutes = require('./routes/users');
+const configRoutes = require('./routes/config');
+
 // Middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -30,6 +34,10 @@ app.options('*', cors());
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use('/api/users', userRoutes);
+app.use('/api/config', configRoutes);
 
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {

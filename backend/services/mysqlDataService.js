@@ -26,6 +26,11 @@ class MySQLDataService {
     }
   }
 
+  // Alias for consistency with other services
+  async initializeService() {
+    return this.initialize();
+  }
+
   async getAllUsers() {
     try {
       const [rows] = await this.pool.query('SELECT * FROM users');

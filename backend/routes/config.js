@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const storageConfig = require('../config/storage');
+const { resetService } = require('../services/serviceManager');
 
 /**
  * @swagger
@@ -35,13 +36,13 @@ router.get('/storage', (req, res) => {
  *             properties:
  *               type:
  *                 type: string
- *                 enum: [mysql, parquet]
+ *                 enum: [mysql, parquet, delta]
  */
 router.put('/storage', async (req, res) => {
   try {
     const { type } = req.body;
     
-    if (!type || !['mysql', 'parquet'].includes(type)) {
+    if (!type || !['mysql', 'parquet', 'delta'].includes(type)) {
       return res.status(400).json({ error: 'Invalid storage type' });
     }
 
@@ -60,6 +61,10 @@ router.put('/storage', async (req, res) => {
       console.log('Initializing Parquet service...');
       const ParquetDataService = require('../services/parquetDataService');
       service = new ParquetDataService();
+    } else if (type === 'delta') {
+      console.log('Initializing Delta Lake service...');
+      const DeltaLakeDataService = require('../services/deltaLakeDataService');
+      service = new DeltaLakeDataService();
     }
 
     // Set a timeout for initialization
@@ -81,6 +86,10 @@ router.put('/storage', async (req, res) => {
       // Only update configuration after successful initialization
       process.env.STORAGE_TYPE = type;
       storageConfig.type = type;
+      
+      // Reset the service manager cache so next request gets the new service
+      resetService();
+      
       console.log('Storage configuration updated successfully');
 
       res.json({ 

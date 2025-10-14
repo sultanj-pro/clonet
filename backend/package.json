@@ -24,6 +24,7 @@
     "helmet": "^5.1.0",
     "morgan": "^1.10.0",
     "mysql2": "^2.3.3",
+    "parquetjs": "^0.11.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0"
   },

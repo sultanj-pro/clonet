@@ -50,19 +50,21 @@ class ParquetDataService {
         throw new Error(`Spark health check failed: ${health.message}`);
       }
       
-      console.log('Creating Delta table...');
+      console.log('Creating Delta table directory...');
       await this.sparkManager.createDeltaTable(this.tableName, this.schema);
       
-      // Verify table creation
-      const verifySQL = `SHOW TABLES LIKE '${this.tableName}'`;
-      const tables = await this.sparkManager.executeSparkSQL(verifySQL);
-      
-      if (!tables.some(t => t.tableName === this.tableName)) {
-        throw new Error(`Table ${this.tableName} was not created successfully`);
+      // For file-based storage, initialize empty data file
+      const dataPath = path.join('/app/data/delta', this.tableName, 'data.json');
+      const fs = require('fs').promises;
+      try {
+        await fs.access(dataPath);
+      } catch {
+        // File doesn't exist, create it with empty array
+        await fs.writeFile(dataPath, JSON.stringify([], null, 2));
       }
       
       this.initialized = true;
-      console.log('ParquetDataService initialized successfully with Delta Lake support');
+      console.log('ParquetDataService initialized successfully with file-based storage');
     } catch (error) {
       console.error('Failed to initialize ParquetDataService:', {
         error: error.message,
@@ -75,19 +77,28 @@ class ParquetDataService {
     }
   }
 
+  async _readDataFile() {
+    const dataPath = path.join('/app/data/delta', this.tableName, 'data.json');
+    const fs = require('fs').promises;
+    try {
+      const content = await fs.readFile(dataPath, 'utf8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('Error reading data file:', error);
+      return [];
+    }
+  }
+
+  async _writeDataFile(data) {
+    const dataPath = path.join('/app/data/delta', this.tableName, 'data.json');
+    const fs = require('fs').promises;
+    await fs.writeFile(dataPath, JSON.stringify(data, null, 2));
+  }
+
   async getAllUsers() {
     try {
-      const result = await this.sparkManager.executeSparkSQL(`
-        SELECT 
-          CAST(id AS STRING) as id,
-          name,
-          email,
-          CAST(created_at AS STRING) as created_at,
-          CAST(updated_at AS STRING) as updated_at 
-        FROM ${this.tableName}
-      `);
-      
-      return this._parseResults(result);
+      const data = await this._readDataFile();
+      return data;
     } catch (error) {
       console.error('Error fetching users:', error);
       throw error;
@@ -96,19 +107,9 @@ class ParquetDataService {
 
   async getUserById(id) {
     try {
-      const result = await this.sparkManager.executeSparkSQL(`
-        SELECT 
-          CAST(id AS STRING) as id,
-          name,
-          email,
-          CAST(created_at AS STRING) as created_at,
-          CAST(updated_at AS STRING) as updated_at 
-        FROM ${this.tableName}
-        WHERE id = ${id}
-      `);
-      
-      const users = this._parseResults(result);
-      return users.length > 0 ? users[0] : null;
+      const data = await this._readDataFile();
+      const user = data.find(u => u.id === parseInt(id));
+      return user || null;
     } catch (error) {
       console.error('Error fetching user by ID:', error);
       throw error;
@@ -117,36 +118,23 @@ class ParquetDataService {
 
   async createUser(userData) {
     try {
-      // Get the next ID
-      const idResult = await this.sparkManager.executeSparkSQL(`
-        SELECT COALESCE(MAX(id), 0) + 1 as next_id 
-        FROM ${this.tableName}
-      `);
+      const data = await this._readDataFile();
       
-      const next_id = parseInt(idResult[0]?.next_id) || 1;
+      // Get the next ID
+      const next_id = data.length > 0 ? Math.max(...data.map(u => u.id)) + 1 : 1;
       const now = new Date().toISOString();
       
-      // Insert the new user using MERGE for idempotency
-      await this.sparkManager.executeSparkSQL(`
-        MERGE INTO ${this.tableName} as target
-        USING (
-          SELECT 
-            ${next_id} as id,
-            '${userData.name}' as name,
-            '${userData.email}' as email,
-            CAST('${now}' AS TIMESTAMP) as created_at,
-            CAST('${now}' AS TIMESTAMP) as updated_at
-        ) as source
-        ON target.id = source.id
-        WHEN NOT MATCHED THEN INSERT *
-      `);
-      
-      return {
+      const newUser = {
         id: next_id,
         ...userData,
         created_at: now,
         updated_at: now
       };
+      
+      data.push(newUser);
+      await this._writeDataFile(data);
+      
+      return newUser;
     } catch (error) {
       console.error('Error creating user:', error);
       throw error;
@@ -155,26 +143,23 @@ class ParquetDataService {
 
   async updateUser(id, userData) {
     try {
+      const data = await this._readDataFile();
+      const index = data.findIndex(u => u.id === parseInt(id));
+      
+      if (index === -1) {
+        return null;
+      }
+      
       const now = new Date().toISOString();
+      data[index] = {
+        ...data[index],
+        ...userData,
+        id: parseInt(id), // Ensure ID doesn't change
+        updated_at: now
+      };
       
-      // Update using MERGE for atomic operation
-      await this.sparkManager.executeSparkSQL(`
-        MERGE INTO ${this.tableName} as target
-        USING (
-          SELECT 
-            ${id} as id,
-            '${userData.name}' as name,
-            '${userData.email}' as email,
-            CAST('${now}' AS TIMESTAMP) as updated_at
-        ) as source
-        ON target.id = source.id
-        WHEN MATCHED THEN UPDATE SET
-          name = source.name,
-          email = source.email,
-          updated_at = source.updated_at
-      `);
-      
-      return await this.getUserById(id);
+      await this._writeDataFile(data);
+      return data[index];
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;
@@ -183,9 +168,14 @@ class ParquetDataService {
 
   async deleteUser(id) {
     try {
-      await this.sparkManager.executeSparkSQL(`
-        DELETE FROM ${this.tableName} WHERE id = ${id}
-      `);
+      const data = await this._readDataFile();
+      const filteredData = data.filter(u => u.id !== parseInt(id));
+      
+      if (data.length === filteredData.length) {
+        return { success: false, id };
+      }
+      
+      await this._writeDataFile(filteredData);
       return { success: true, id };
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -195,19 +185,13 @@ class ParquetDataService {
 
   async searchUsers(searchTerm) {
     try {
-      const result = await this.sparkManager.executeSparkSQL(`
-        SELECT 
-          CAST(id AS STRING) as id,
-          name,
-          email,
-          CAST(created_at AS STRING) as created_at,
-          CAST(updated_at AS STRING) as updated_at 
-        FROM ${this.tableName}
-        WHERE LOWER(name) LIKE '%${searchTerm.toLowerCase()}%'
-        OR LOWER(email) LIKE '%${searchTerm.toLowerCase()}%'
-      `);
+      const data = await this._readDataFile();
+      const lowerSearchTerm = searchTerm.toLowerCase();
       
-      return this._parseResults(result);
+      return data.filter(user =>
+        user.name.toLowerCase().includes(lowerSearchTerm) ||
+        user.email.toLowerCase().includes(lowerSearchTerm)
+      );
     } catch (error) {
       console.error('Error searching users:', error);
       throw error;
@@ -216,19 +200,8 @@ class ParquetDataService {
 
   async getPaginatedUsers(limit, offset) {
     try {
-      const result = await this.sparkManager.executeSparkSQL(`
-        SELECT 
-          CAST(id AS STRING) as id,
-          name,
-          email,
-          CAST(created_at AS STRING) as created_at,
-          CAST(updated_at AS STRING) as updated_at 
-        FROM ${this.tableName}
-        ORDER BY id
-        LIMIT ${limit} OFFSET ${offset}
-      `);
-      
-      return this._parseResults(result);
+      const data = await this._readDataFile();
+      return data.slice(offset, offset + limit);
     } catch (error) {
       console.error('Error fetching paginated users:', error);
       throw error;
@@ -237,42 +210,25 @@ class ParquetDataService {
 
   async getUserCount() {
     try {
-      const result = await this.sparkManager.executeSparkSQL(`
-        SELECT COUNT(*) as count FROM ${this.tableName}
-      `);
-      
-      return parseInt(result[0]?.count) || 0;
+      const data = await this._readDataFile();
+      return data.length;
     } catch (error) {
       console.error('Error getting user count:', error);
       throw error;
     }
   }
 
-  // Delta Lake specific features
+  // Delta Lake specific features (placeholders for file-based implementation)
   async getTableHistory() {
-    return await this.sparkManager.getTableHistory(this.tableName);
+    return { message: 'Table history not available in file-based mode' };
   }
 
   async getUsersAsOf(version) {
-    const result = await this.sparkManager.readVersionAsOf(this.tableName, version);
-    return this._parseResults(result);
+    return { message: 'Version history not available in file-based mode' };
   }
 
   async optimize() {
-    await this.sparkManager.compactTable(this.tableName);
-  }
-
-  // Helper method to parse Databricks SQL results
-  _parseResults(result) {
-    if (!result || !Array.isArray(result)) return [];
-    
-    return result.map(row => ({
-      id: parseInt(row.id),
-      name: row.name,
-      email: row.email,
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    }));
+    return { message: 'Optimization not needed for file-based storage' };
   }
 
   async healthCheck() {
@@ -282,7 +238,7 @@ class ParquetDataService {
       
       return {
         status: 'healthy',
-        message: 'ParquetDataService is operational with Delta Lake',
+        message: 'ParquetDataService is operational with file-based storage',
         sparkStatus: sparkHealth,
         userCount
       };

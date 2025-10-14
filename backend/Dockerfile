@@ -69,19 +69,8 @@ ENV SPARK_HOME=/opt/spark \
 RUN mkdir -p /tmp/spark-temp /tmp/spark-worker && \
     chmod -R 777 /tmp/spark-*
 
-# Create non-root user and set up permissions in one layer
-RUN groupadd -g 1001 nodejs && \
-    useradd -u 1001 -g nodejs -s /bin/bash -m nodejs && \
-    mkdir -p /app/node_modules && \
-    chown -R nodejs:nodejs /app /tmp/spark-*
-
-# Copy source code as nodejs user
-USER nodejs
-COPY --chown=nodejs:nodejs . .
-
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+# Copy source code
+COPY . .
 
 # Expose port
 EXPOSE 5000

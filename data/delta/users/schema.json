@@ -1,0 +1,22 @@
+[
+  {
+    "name": "id",
+    "type": "BIGINT"
+  },
+  {
+    "name": "name",
+    "type": "STRING"
+  },
+  {
+    "name": "email",
+    "type": "STRING"
+  },
+  {
+    "name": "created_at",
+    "type": "TIMESTAMP"
+  },
+  {
+    "name": "updated_at",
+    "type": "TIMESTAMP"
+  }
+]

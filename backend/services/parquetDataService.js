@@ -54,7 +54,7 @@ class ParquetDataService {
       await this.sparkManager.createDeltaTable(this.tableName, this.schema);
       
       // For file-based storage, initialize empty data file
-      const dataPath = path.join('/app/data/delta', this.tableName, 'data.json');
+      const dataPath = path.join('/app/data/parquet', this.tableName, 'data.json');
       const fs = require('fs').promises;
       try {
         await fs.access(dataPath);
@@ -78,7 +78,7 @@ class ParquetDataService {
   }
 
   async _readDataFile() {
-    const dataPath = path.join('/app/data/delta', this.tableName, 'data.json');
+    const dataPath = path.join('/app/data/parquet', this.tableName, 'data.json');
     const fs = require('fs').promises;
     try {
       const content = await fs.readFile(dataPath, 'utf8');
@@ -90,7 +90,7 @@ class ParquetDataService {
   }
 
   async _writeDataFile(data) {
-    const dataPath = path.join('/app/data/delta', this.tableName, 'data.json');
+    const dataPath = path.join('/app/data/parquet', this.tableName, 'data.json');
     const fs = require('fs').promises;
     await fs.writeFile(dataPath, JSON.stringify(data, null, 2));
   }

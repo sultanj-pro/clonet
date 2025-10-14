@@ -62,9 +62,9 @@ router.put('/storage', async (req, res) => {
       const ParquetDataService = require('../services/parquetDataService');
       service = new ParquetDataService();
     } else if (type === 'delta') {
-      console.log('Initializing Delta Lake service...');
-      const DeltaLakeDataService = require('../services/deltaLakeDataService');
-      service = new DeltaLakeDataService();
+      console.log('Initializing Delta Table Format service...');
+      const DeltaTableDataService = require('../services/deltaTableDataService.simple');
+      service = new DeltaTableDataService();
     }
 
     // Set a timeout for initialization

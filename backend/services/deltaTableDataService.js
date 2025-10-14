@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const parquet = require('parquetjs');
 
-class DeltaLakeDataService {
+class DeltaTableDataService {
   constructor() {
     this.tableName = 'users';
     this.deltaBasePath = path.join('/app/data/delta', this.tableName);
@@ -493,4 +493,4 @@ class DeltaLakeDataService {
   }
 }
 
-module.exports = DeltaLakeDataService;
+module.exports = DeltaTableDataService;

@@ -4,7 +4,7 @@ import Loading from './Loading';
 import './ConfigurationPage.css';
 
 const ConfigurationPage: React.FC = () => {
-  const [storageType, setStorageType] = useState<'mysql' | 'parquet'>('mysql');
+  const [storageType, setStorageType] = useState<'mysql' | 'parquet' | 'delta'>('mysql');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -27,7 +27,7 @@ const ConfigurationPage: React.FC = () => {
     }
   };
 
-  const handleStorageTypeChange = async (newType: 'mysql' | 'parquet') => {
+  const handleStorageTypeChange = async (newType: 'mysql' | 'parquet' | 'delta') => {
     try {
       setIsLoading(true);
       setError('');
@@ -35,6 +35,8 @@ const ConfigurationPage: React.FC = () => {
       
       if (newType === 'parquet') {
         setSuccessMessage('Initializing Parquet storage (this may take up to a minute)...');
+      } else if (newType === 'delta') {
+        setSuccessMessage('Initializing Delta Table Format storage (this may take up to a minute)...');
       } else {
         setSuccessMessage('Switching to MySQL storage...');
       }
@@ -65,6 +67,8 @@ const ConfigurationPage: React.FC = () => {
         <Loading text={
           storageType === 'parquet' 
             ? 'Initializing Parquet storage (this may take a few seconds)...'
+            : storageType === 'delta'
+            ? 'Initializing Delta Table Format storage (this may take a few seconds)...'
             : 'Updating configuration...'
         } />
       </div>
@@ -119,14 +123,35 @@ const ConfigurationPage: React.FC = () => {
               <p>Efficient columnar storage format for analytics</p>
             </label>
           </div>
+
+          <div className="storage-option">
+            <input
+              type="radio"
+              id="delta"
+              name="storageType"
+              value="delta"
+              checked={storageType === 'delta'}
+              onChange={() => handleStorageTypeChange('delta')}
+            />
+            <label htmlFor="delta">
+              <strong>Delta Table Format</strong>
+              <p>ACID-compliant storage with Parquet files and transaction logs</p>
+            </label>
+          </div>
         </div>
 
         <div className="storage-info">
-          <h4>Current Storage: {storageType === 'mysql' ? 'MySQL Database' : 'Parquet Files'}</h4>
+          <h4>Current Storage: {
+            storageType === 'mysql' ? 'MySQL Database' : 
+            storageType === 'parquet' ? 'Parquet Files' : 
+            'Delta Table Format'
+          }</h4>
           <p className="storage-description">
             {storageType === 'mysql' 
               ? 'Using MySQL for traditional relational database storage. Ideal for transactional data and real-time operations.'
-              : 'Using Parquet files for efficient data storage. Optimized for analytical queries and big data workloads.'}
+              : storageType === 'parquet'
+              ? 'Using Parquet files for efficient data storage. Optimized for analytical queries and big data workloads.'
+              : 'Using Delta Table Format for ACID-compliant data storage. Combines Parquet files with transaction logs for versioning and time travel capabilities.'}
           </p>
         </div>
       </div>

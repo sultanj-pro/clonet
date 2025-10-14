@@ -19,5 +19,5 @@ export interface ApiError {
 }
 
 export interface StorageConfig {
-  type: 'mysql' | 'parquet';
+  type: 'mysql' | 'parquet' | 'delta';
 }

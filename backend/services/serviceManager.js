@@ -1,5 +1,5 @@
 const ParquetDataService = require('./parquetDataService');
-// const DeltaLakeDataService = require('./deltaLakeDataService'); // Temporarily disabled
+const DeltaTableDataService = require('./deltaTableDataService.simple');
 const MySQLDataService = require('./mysqlDataService');
 const storageConfig = require('../config/storage');
 
@@ -16,9 +16,7 @@ const initializeService = async () => {
           dataService = new ParquetDataService();
           break;
         case 'delta':
-          console.log('Delta Lake service temporarily disabled - using parquet instead');
-          dataService = new ParquetDataService();
-          // dataService = new DeltaLakeDataService();
+          dataService = new DeltaTableDataService();
           break;
         default:
           throw new Error(`Unsupported storage type: ${storageConfig.type}`);

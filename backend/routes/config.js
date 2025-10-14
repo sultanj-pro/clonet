@@ -45,27 +45,75 @@ router.put('/storage', async (req, res) => {
       return res.status(400).json({ error: 'Invalid storage type' });
     }
 
-    // Update storage configuration
-    process.env.STORAGE_TYPE = type;
-    storageConfig.type = type;
+    console.log('Storage switch request:', {
+      requestedType: type,
+      currentType: storageConfig.type,
+      body: req.body
+    });
     
-    // Re-initialize services based on new storage type
+    let service;
+    // Initialize the appropriate storage service first
+    if (type === 'mysql') {
+      const MySQLDataService = require('../services/mysqlDataService');
+      service = new MySQLDataService();
+    } else if (type === 'parquet') {
+      console.log('Initializing Parquet service...');
+      const ParquetDataService = require('../services/parquetDataService');
+      service = new ParquetDataService();
+    }
+
+    // Set a timeout for initialization
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Service initialization timed out')), 45000); // 45 seconds timeout
+    });
+
     try {
-      if (type === 'mysql') {
-        const mysqlService = require('../services/mysqlDataService');
-        await mysqlService.initialize();
-      } else if (type === 'parquet') {
-        const parquetService = require('../services/parquetDataService');
-        // Add any initialization if needed for parquet service
+      console.log(`Starting ${type} service initialization...`);
+      
+      // Race between initialization and timeout
+      await Promise.race([
+        service.initializeService(),
+        timeoutPromise
+      ]);
+      
+      console.log(`${type} service initialized successfully`);
+
+      // Only update configuration after successful initialization
+      process.env.STORAGE_TYPE = type;
+      storageConfig.type = type;
+      console.log('Storage configuration updated successfully');
+
+      res.json({ 
+        type: storageConfig.type,
+        message: `Successfully switched to ${type} storage`
+      });
+    } catch (initError) {
+      console.error('Detailed initialization error:', {
+        message: initError.message,
+        stack: initError.stack,
+        type: type
+      });
+      
+      if (initError.message === 'Service initialization timed out') {
+        res.status(503).json({ 
+          error: 'Service initialization is taking longer than expected',
+          type: storageConfig.type // Return current storage type
+        });
+      } else {
+        // Return more detailed error information
+        res.status(500).json({
+          error: 'Failed to initialize storage service',
+          details: initError.message,
+          type: storageConfig.type
+        });
       }
-      res.json({ type });
-    } catch (error) {
-      console.error('Error initializing service:', error);
-      res.status(500).json({ error: 'Failed to initialize new storage service' });
     }
   } catch (error) {
     console.error('Error updating storage configuration:', error);
-    res.status(500).json({ error: 'Failed to update storage configuration' });
+    res.status(500).json({ 
+      error: 'Failed to update storage configuration',
+      details: error.message 
+    });
   }
 });
 

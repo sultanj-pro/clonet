@@ -1,13 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const storageConfig = require('../config/storage');
-const mysqlService = require('../services/mysqlDataService');
-const parquetService = require('../services/parquetDataService');
+const { getDataService } = require('../services/serviceManager');
 
-// Helper to get the appropriate data service
-const getDataService = () => {
-  return storageConfig.type === 'parquet' ? parquetService : mysqlService;
-};
+// Getting data service is now handled by serviceManager
 
 /**
  * @swagger
@@ -56,24 +52,17 @@ router.get('/', async (req, res) => {
   try {
     const { page, pageSize, search } = req.query;
     
+    const dataService = await getDataService();
+
     if (search) {
-      const [users] = await db.execute(
-        'SELECT * FROM users WHERE name LIKE ? OR email LIKE ?',
-        [`%${search}%`, `%${search}%`]
-      );
+      const users = await dataService.searchUsers(search);
       res.json(users);
     } else if (page && pageSize) {
       const offset = (parseInt(page) - 1) * parseInt(pageSize);
       const limit = parseInt(pageSize);
       
-      const [[{ total }]] = await db.execute(
-        'SELECT COUNT(*) as total FROM users'
-      );
-      
-      const [users] = await db.execute(
-        'SELECT * FROM users ORDER BY id LIMIT ? OFFSET ?',
-        [limit, offset]
-      );
+      const total = await dataService.getUserCount();
+      const users = await dataService.getPaginatedUsers(limit, offset);
       
       res.json({
         users,
@@ -85,7 +74,7 @@ router.get('/', async (req, res) => {
         }
       });
     } else {
-      const [users] = await db.execute('SELECT * FROM users');
+      const users = await dataService.getAllUsers();
       res.json(users);
     }
   } catch (error) {
@@ -126,11 +115,14 @@ router.get('/', async (req, res) => {
 // GET user by ID
 router.get('/:id', async (req, res) => {
   try {
-    const [users] = await db.execute('SELECT * FROM users WHERE id = ?', [req.params.id]);
-    if (users.length === 0) {
+    const dataService = await getDataService();
+    const user = await dataService.getUserById(req.params.id);
+    
+    if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(users[0]);
+    
+    res.json(user);
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ 
@@ -165,8 +157,9 @@ router.get('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await db.execute('DELETE FROM users WHERE id = ?', [id]);
-    if (result.affectedRows === 0) {
+    const dataService = await getDataService();
+    const result = await dataService.deleteUser(parseInt(id, 10));
+    if (!result) {
       res.status(404).json({ message: 'User not found' });
     } else {
       res.json({ message: 'User deleted successfully' });
@@ -219,19 +212,15 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Name and email are required' });
     }
     
-    // Insert the new user into the database
-    const [result] = await db.query(
-      'INSERT INTO users (name, email, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
-      [name, email]
-    );
+    const dataService = await getDataService();
+    const newUser = await dataService.createUser({ 
+      name, 
+      email,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
     
-    // Fetch the newly created user
-    const [newUser] = await db.query(
-      'SELECT * FROM users WHERE id = ?',
-      [result.insertId]
-    );
-    
-    res.status(201).json(newUser[0]);
+    res.status(201).json(newUser);
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ 
@@ -289,25 +278,21 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Name and email are required' });
     }
     
-    // Update the user in the database
-    const [result] = await db.query(
-      'UPDATE users SET name = ?, email = ?, updated_at = NOW() WHERE id = ?',
-      [name, email, req.params.id]
-    );
+    const dataService = await getDataService();
+    const id = parseInt(req.params.id, 10);
     
-    if (result.affectedRows === 0) {
+    // First check if the user exists
+    const existingUser = await dataService.getUserById(id);
+    if (!existingUser) {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Fetch the updated user to return
-    const [[updatedUser]] = await db.query(
-      'SELECT * FROM users WHERE id = ?',
-      [req.params.id]
-    );
-    
-    if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found after update' });
-    }
+    // Update the user
+    const updatedUser = await dataService.updateUser(id, {
+      name,
+      email,
+      updated_at: new Date()
+    });
     
     res.json(updatedUser);
   } catch (error) {

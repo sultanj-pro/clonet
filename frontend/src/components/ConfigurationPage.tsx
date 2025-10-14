@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getStorageConfig, updateStorageConfig } from '../services';
+import Loading from './Loading';
 import './ConfigurationPage.css';
 
 const ConfigurationPage: React.FC = () => {
@@ -29,17 +30,29 @@ const ConfigurationPage: React.FC = () => {
   const handleStorageTypeChange = async (newType: 'mysql' | 'parquet') => {
     try {
       setIsLoading(true);
+      setError('');
+      setSuccessMessage('');
+      
+      if (newType === 'parquet') {
+        setSuccessMessage('Initializing Parquet storage (this may take up to a minute)...');
+      } else {
+        setSuccessMessage('Switching to MySQL storage...');
+      }
+
       await updateStorageConfig({ type: newType });
       setStorageType(newType);
-      setSuccessMessage('Storage configuration updated successfully');
-      setError('');
+      setSuccessMessage(`Successfully switched to ${newType} storage`);
+      
+      // Reload configuration to verify the change
+      await loadConfiguration();
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
     } catch (err) {
-      setError('Failed to update storage configuration');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update storage configuration';
+      setError(errorMessage);
       console.error('Error updating storage type:', err);
     } finally {
       setIsLoading(false);
@@ -47,7 +60,15 @@ const ConfigurationPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="configuration-page loading">Loading...</div>;
+    return (
+      <div className="configuration-page">
+        <Loading text={
+          storageType === 'parquet' 
+            ? 'Initializing Parquet storage (this may take a few seconds)...'
+            : 'Updating configuration...'
+        } />
+      </div>
+    );
   }
 
   return (

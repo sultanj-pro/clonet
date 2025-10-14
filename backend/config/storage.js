@@ -1,19 +1,19 @@
+const path = require('path');
+
 // Storage configuration
 const storageConfig = {
-  // Can be 'mysql' or 'parquet'
-  type: process.env.STORAGE_TYPE || 'mysql',
+  type: process.env.STORAGE_TYPE || 'mysql',  // Default to MySQL if not specified
   
-  // MySQL specific configuration
   mysql: {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_NAME || 'users_db'
+    host: process.env.DB_HOST || 'mysql',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'clonet_user',
+    password: process.env.DB_PASSWORD || 'clonet_password',
+    database: process.env.DB_NAME || 'clonet_db'
   },
   
-  // Parquet specific configuration
   parquet: {
-    basePath: process.env.PARQUET_BASE_PATH || '../data/parquet'
+    basePath: process.env.PARQUET_BASE_PATH || path.join(__dirname, '..', 'data', 'delta')
   }
 };
 

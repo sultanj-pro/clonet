@@ -1,14 +1,36 @@
-# Development Dockerfile for backend with Spark support
+# Development Dockerfile for backend with Spark and Delta Lake support
 FROM node:18-alpine
 
-# Install OpenJDK 11 for Spark
-RUN apk add --no-cache openjdk11-jre
+# Install required packages
+RUN apk add --no-cache openjdk11-jre wget tar bash
 
 # Set JAVA_HOME
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
 ENV PATH=$PATH:$JAVA_HOME/bin
 
+# Set Spark version and Delta Lake version
+ENV SPARK_VERSION=3.4.1
+ENV DELTA_VERSION=2.4.0
+
 WORKDIR /app
+
+# Download and set up Apache Spark
+RUN mkdir -p /opt/spark \
+    && cd /opt \
+    && wget https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+    && tar xf spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+    && mv spark-${SPARK_VERSION}-bin-hadoop3/* /opt/spark/ \
+    && rm -rf spark-${SPARK_VERSION}-bin-hadoop3.tgz spark-${SPARK_VERSION}-bin-hadoop3
+
+# Download Delta Lake JAR
+RUN mkdir -p /opt/spark/jars \
+    && cd /opt/spark/jars \
+    && wget https://repo1.maven.org/maven2/io/delta/delta-core_2.12/${DELTA_VERSION}/delta-core_2.12-${DELTA_VERSION}.jar \
+    && wget https://repo1.maven.org/maven2/io/delta/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar
+
+# Set Spark environment variables
+ENV SPARK_HOME=/opt/spark
+ENV PATH=$PATH:$SPARK_HOME/bin
 
 # Copy package files
 COPY package*.json ./
@@ -19,12 +41,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Create directories for Spark
-RUN mkdir -p /opt/spark/jars /opt/spark/warehouse
-
-# Download MySQL connector JAR
-RUN wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.1.0/mysql-connector-j-8.1.0.jar \
-    -O /opt/spark/jars/mysql-connector-java.jar
+# Create directories for Spark and Delta Lake
+RUN mkdir -p /opt/spark/jars /opt/spark/warehouse /app/data/delta
 
 # Expose port
 EXPOSE 5000

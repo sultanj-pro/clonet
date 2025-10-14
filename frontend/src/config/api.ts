@@ -5,4 +5,5 @@ export const defaultOptions = {
     'Content-Type': 'application/json',
   },
   credentials: 'include' as RequestCredentials,
+  timeout: 30000, // 30 seconds timeout
 };

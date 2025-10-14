@@ -1,15 +1,13 @@
 import { User, UserInput, ApiError, StorageConfig } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = '/api';
 
 // Common fetch options for all API calls
 const defaultOptions: RequestInit = {
-  mode: 'cors',
-  credentials: 'include',
   headers: {
     'Accept': 'application/json',
-    'Content-Type': 'application/json',
-  },
+    'Content-Type': 'application/json'
+  }
 };
 
 export const fetchUsers = async (): Promise<User[]> => {

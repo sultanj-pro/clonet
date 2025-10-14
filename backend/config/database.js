@@ -11,20 +11,22 @@ const dbConfig = {
   waitForConnections: true
 };
 
-const pool = mysql.createPool(dbConfig);
-
 // Test connection
 const testConnection = async () => {
   try {
-    const connection = await pool.getConnection();
+    const testPool = mysql.createPool(dbConfig);
+    const connection = await testPool.getConnection();
+    await connection.release();
+    await testPool.end();
     console.log('Database connected successfully');
-    connection.release();
+    return true;
   } catch (error) {
     console.error('Database connection failed:', error.message);
+    return false;
   }
 };
 
 // Initialize connection test
 testConnection();
 
-module.exports = pool;
+module.exports = dbConfig;

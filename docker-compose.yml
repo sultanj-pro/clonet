@@ -32,7 +32,6 @@ services:
       - backend_node_modules:/app/node_modules
       - ./data/parquet:/app/data/parquet
       - ./data/delta:/app/data/delta
-      - spark_warehouse:/opt/spark/warehouse
     environment:
       - NODE_ENV=development
       - DB_HOST=mysql
@@ -77,5 +76,4 @@ networks:
 volumes:
   frontend_node_modules:
   backend_node_modules:
-  spark_warehouse:
   mysql_data:

@@ -8,9 +8,9 @@
   },
   {
     "id": 2,
-    "name": "another parquet",
-    "email": "parqueta@example.com",
-    "created_at": "2025-10-14T21:17:39.151Z",
-    "updated_at": "2025-10-14T21:17:39.151Z"
+    "name": "parquet user",
+    "email": "puser@example.com",
+    "created_at": "2025-10-15T14:25:32.354Z",
+    "updated_at": "2025-10-15T14:25:32.354Z"
   }
 ]

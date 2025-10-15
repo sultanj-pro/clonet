@@ -24,7 +24,14 @@
   margin: 20px 0;
 }
 
-.storage-option {
+.access-method-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.storage-option, .access-method-option {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -34,30 +41,38 @@
   transition: all 0.3s ease;
 }
 
-.storage-option:hover {
+.storage-option:hover, .access-method-option:hover {
   border-color: #007bff;
   background-color: #f8f9fa;
 }
 
-.storage-option input[type="radio"] {
+.storage-option input[type="radio"], .access-method-option input[type="radio"] {
   margin-top: 4px;
 }
 
-.storage-option label {
+.storage-option label, .access-method-option label {
   flex: 1;
   cursor: pointer;
 }
 
-.storage-option label strong {
+.storage-option label strong, .access-method-option label strong {
   display: block;
   margin-bottom: 5px;
   color: #333;
 }
 
-.storage-option label p {
+.storage-option label p, .access-method-option label p {
   margin: 0;
   color: #666;
   font-size: 0.9em;
+}
+
+.current-config {
+  padding: 15px;
+  background-color: #e7f3ff;
+  border-left: 4px solid #007bff;
+  border-radius: 4px;
+  font-size: 1.1em;
 }
 
 .storage-info {
@@ -72,10 +87,11 @@
   margin-bottom: 10px;
 }
 
-.storage-description {
+.storage-description, .access-description {
   color: #666;
   font-size: 0.9em;
   line-height: 1.5;
+  margin-bottom: 10px;
 }
 
 .error-message {

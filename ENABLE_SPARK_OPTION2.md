@@ -1,5 +1,12 @@
+# Option 2: Use Pre-built Spark Docker Image
+
+## Instead of installing Spark ourselves, use an official Spark image as base
+
+### Update Dockerfile:
+
+```dockerfile
 # Backend Dockerfile using Apache Spark base image
-FROM apache/spark:3.5.0
+FROM apache/spark:3.5.0-scala2.12-java17-ubuntu
 
 # Switch to root to install Node.js
 USER root
@@ -18,7 +25,7 @@ WORKDIR /app
 ENV SPARK_HOME=/opt/spark
 ENV PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 
-# Download Delta Lake and MySQL JARs (smaller files)
+# Download Delta Lake and MySQL JARs
 RUN curl -L -o ${SPARK_HOME}/jars/delta-spark_2.12-3.0.0.jar \
     https://repo1.maven.org/maven2/io/delta/delta-spark_2.12/3.0.0/delta-spark_2.12-3.0.0.jar && \
     curl -L -o ${SPARK_HOME}/jars/delta-storage-3.0.0.jar \
@@ -26,7 +33,7 @@ RUN curl -L -o ${SPARK_HOME}/jars/delta-spark_2.12-3.0.0.jar \
     curl -L -o ${SPARK_HOME}/jars/mysql-connector-j-8.2.0.jar \
     https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.2.0/mysql-connector-j-8.2.0.jar
 
-# Set Spark configuration for local mode
+# Set Spark configuration
 ENV SPARK_MASTER=local[*]
 ENV SPARK_DRIVER_MEMORY=1g
 ENV SPARK_EXECUTOR_MEMORY=1g
@@ -54,3 +61,14 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Start the application
 CMD ["npm", "start"]
+```
+
+### Advantages:
+✅ No manual download needed
+✅ Spark pre-configured correctly
+✅ Official Apache image
+
+### Disadvantages:
+❌ Larger base image
+❌ Still requires downloading (but from Docker Hub, usually faster)
+❌ Contains full Spark server setup (we only need client tools)

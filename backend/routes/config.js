@@ -9,13 +9,17 @@ const { resetService } = require('../services/serviceManager');
  *   get:
  *     tags: [Configuration]
  *     summary: Get current storage configuration
- *     description: Retrieve the current storage type configuration
+ *     description: Retrieve the current storage type and access method configuration
  *     responses:
  *       200:
  *         description: Current storage configuration
  */
 router.get('/storage', (req, res) => {
-  res.json({ type: storageConfig.type });
+  res.json({ 
+    type: storageConfig.type,
+    accessMethod: storageConfig.accessMethod,
+    label: storageConfig.getLabel()
+  });
 });
 
 /**
@@ -24,56 +28,81 @@ router.get('/storage', (req, res) => {
  *   put:
  *     tags: [Configuration]
  *     summary: Update storage configuration
- *     description: Update the storage type configuration
+ *     description: Update the storage type and/or data access method configuration
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - type
  *             properties:
  *               type:
  *                 type: string
  *                 enum: [mysql, parquet, delta]
+ *               accessMethod:
+ *                 type: string
+ *                 enum: [direct, sparksession]
  */
 router.put('/storage', async (req, res) => {
   try {
-    const { type } = req.body;
+    const { type, accessMethod } = req.body;
     
-    if (!type || !['mysql', 'parquet', 'delta'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid storage type' });
+    // Use current values if not provided
+    const newType = type || storageConfig.type;
+    const newAccessMethod = accessMethod || storageConfig.accessMethod;
+
+    // Validate type
+    if (!['mysql', 'parquet', 'delta'].includes(newType)) {
+      return res.status(400).json({ error: `Invalid storage type: ${newType}` });
     }
 
-    console.log('Storage switch request:', {
-      requestedType: type,
-      currentType: storageConfig.type,
-      body: req.body
+    // Validate access method
+    if (!['direct', 'sparksession'].includes(newAccessMethod)) {
+      return res.status(400).json({ error: `Invalid access method: ${newAccessMethod}` });
+    }
+
+    console.log('Storage configuration switch request:', {
+      from: `${storageConfig.type}-${storageConfig.accessMethod}`,
+      to: `${newType}-${newAccessMethod}`
     });
     
-    let service;
-    // Initialize the appropriate storage service first
-    if (type === 'mysql') {
-      const MySQLDataService = require('../services/mysqlDataService');
-      service = new MySQLDataService();
-    } else if (type === 'parquet') {
-      console.log('Initializing Parquet service...');
-      const ParquetDataService = require('../services/parquetDataService');
-      service = new ParquetDataService();
-    } else if (type === 'delta') {
-      console.log('Initializing Delta Table Format service...');
-      const DeltaTableDataService = require('../services/deltaTableDataService.simple');
-      service = new DeltaTableDataService();
+    // Get the appropriate service class
+    let ServiceClass;
+    const serviceKey = `${newType}-${newAccessMethod}`;
+    
+    switch (serviceKey) {
+      case 'mysql-direct':
+        ServiceClass = require('../services/mysqlDataService');
+        break;
+      case 'mysql-sparksession':
+        ServiceClass = require('../services/sparkMySQLDataService');
+        break;
+      case 'parquet-direct':
+        ServiceClass = require('../services/parquetDataService');
+        break;
+      case 'parquet-sparksession':
+        ServiceClass = require('../services/sparkParquetDataService');
+        break;
+      case 'delta-direct':
+        ServiceClass = require('../services/deltaTableDataService.simple');
+        break;
+      case 'delta-sparksession':
+        ServiceClass = require('../services/sparkDeltaDataService');
+        break;
+      default:
+        return res.status(400).json({ error: `Unsupported configuration: ${serviceKey}` });
     }
+
+    // Create and initialize the service
+    const service = new ServiceClass();
 
     // Set a timeout for initialization
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Service initialization timed out')), 45000); // 45 seconds timeout
+      setTimeout(() => reject(new Error('Service initialization timed out')), 90000); // 90 seconds timeout for Spark
     });
 
     try {
-      console.log(`Starting ${type} service initialization...`);
+      console.log(`Initializing service: ${serviceKey}...`);
       
       // Race between initialization and timeout
       await Promise.race([
@@ -81,11 +110,13 @@ router.put('/storage', async (req, res) => {
         timeoutPromise
       ]);
       
-      console.log(`${type} service initialized successfully`);
+      console.log(`Service ${serviceKey} initialized successfully`);
 
       // Only update configuration after successful initialization
-      process.env.STORAGE_TYPE = type;
-      storageConfig.type = type;
+      process.env.STORAGE_TYPE = newType;
+      process.env.DATA_ACCESS_METHOD = newAccessMethod;
+      storageConfig.type = newType;
+      storageConfig.accessMethod = newAccessMethod;
       
       // Reset the service manager cache so next request gets the new service
       resetService();
@@ -94,26 +125,31 @@ router.put('/storage', async (req, res) => {
 
       res.json({ 
         type: storageConfig.type,
-        message: `Successfully switched to ${type} storage`
+        accessMethod: storageConfig.accessMethod,
+        label: storageConfig.getLabel(),
+        message: `Successfully switched to ${storageConfig.getLabel()}`
       });
     } catch (initError) {
       console.error('Detailed initialization error:', {
         message: initError.message,
         stack: initError.stack,
-        type: type
+        type: newType,
+        accessMethod: newAccessMethod
       });
       
       if (initError.message === 'Service initialization timed out') {
         res.status(503).json({ 
           error: 'Service initialization is taking longer than expected',
-          type: storageConfig.type // Return current storage type
+          type: storageConfig.type,
+          accessMethod: storageConfig.accessMethod
         });
       } else {
         // Return more detailed error information
         res.status(500).json({
           error: 'Failed to initialize storage service',
           details: initError.message,
-          type: storageConfig.type
+          type: storageConfig.type,
+          accessMethod: storageConfig.accessMethod
         });
       }
     }

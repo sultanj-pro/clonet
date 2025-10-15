@@ -40,10 +40,47 @@ services:
       - DB_PASSWORD=password
       - DB_NAME=clonet_db
       - PORT=5000
+      - SPARK_SERVICE_URL=http://spark-service:8000
     deploy:
       resources:
         limits:
           memory: 2G
+    depends_on:
+      mysql:
+        condition: service_healthy
+      spark-service:
+        condition: service_healthy
+    networks:
+      - clonet-network
+
+  spark-service:
+    container_name: clonet-spark-service
+    build:
+      context: ./spark-service
+      dockerfile: Dockerfile
+    image: clonet-spark-service:latest
+    ports:
+      - "8000:8000"  # Flask API
+      - "4040:4040"  # Spark UI
+    volumes:
+      - ./data/parquet:/data/parquet
+      - ./data/delta:/data/delta
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=clonet_db
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/spark/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
       mysql:
         condition: service_healthy

@@ -1,32 +1,32 @@
-const sparkSessionManager = require('../config/sparkSessionManager');
+const sparkServiceClient = require('../clients/sparkServiceClient');
 const storageConfig = require('../config/storage');
 
 /**
- * SparkMySQLDataService - Access MySQL using SparkSession JDBC
+ * SparkMySQLDataService - Access MySQL using Spark Service
  * 
- * This service uses Spark's JDBC connector to read from MySQL
- * instead of the direct mysql2 library.
+ * This service uses the separate Spark service container via HTTP
+ * to execute queries against MySQL using Spark's JDBC connector.
  */
 class SparkMySQLDataService {
   constructor() {
     this.tableName = 'users';
     this.jdbcUrl = `jdbc:mysql://${storageConfig.mysql.host}:${storageConfig.mysql.port}/${storageConfig.mysql.database}`;
-    this.jdbcOptions = {
+    this.jdbcConfig = {
+      url: this.jdbcUrl,
       user: storageConfig.mysql.user,
       password: storageConfig.mysql.password,
       driver: 'com.mysql.cj.jdbc.Driver'
     };
-    this.tempViewName = 'mysql_users_view';
   }
 
   async initializeService() {
     console.log('Initializing SparkMySQLDataService...');
     
-    // Initialize SparkSession
-    await sparkSessionManager.initialize();
-    
-    // Don't create temp view during initialization since we create it
-    // in each query (temp views don't persist across spark-sql processes)
+    // Check if Spark service is available
+    const isHealthy = await sparkServiceClient.healthCheck();
+    if (!isHealthy) {
+      throw new Error('Spark service is not available');
+    }
     
     console.log('SparkMySQLDataService initialized successfully');
   }
@@ -54,21 +54,8 @@ class SparkMySQLDataService {
 
   async getAllUsers() {
     try {
-      // Include temp view creation in the same Spark SQL command
-      const query = `
-        CREATE OR REPLACE TEMPORARY VIEW ${this.tempViewName}
-        USING org.apache.spark.sql.jdbc
-        OPTIONS (
-          url '${this.jdbcUrl}',
-          dbtable '${this.tableName}',
-          user '${this.jdbcOptions.user}',
-          password '${this.jdbcOptions.password}',
-          driver '${this.jdbcOptions.driver}'
-        );
-        
-        SELECT * FROM ${this.tempViewName};
-      `;
-      return await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT * FROM ${this.tableName}`;
+      return await sparkServiceClient.executeMySQLQuery(sql, this.jdbcConfig);
     } catch (error) {
       console.error('Error fetching users via Spark:', error);
       throw error;
@@ -77,22 +64,8 @@ class SparkMySQLDataService {
 
   async getPaginatedUsers(limit, offset) {
     try {
-      const query = `
-        CREATE OR REPLACE TEMPORARY VIEW ${this.tempViewName}
-        USING org.apache.spark.sql.jdbc
-        OPTIONS (
-          url '${this.jdbcUrl}',
-          dbtable '${this.tableName}',
-          user '${this.jdbcOptions.user}',
-          password '${this.jdbcOptions.password}',
-          driver '${this.jdbcOptions.driver}'
-        );
-        
-        SELECT * FROM ${this.tempViewName}
-        ORDER BY id
-        LIMIT ${limit} OFFSET ${offset};
-      `;
-      return await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT * FROM ${this.tableName} ORDER BY id LIMIT ${limit} OFFSET ${offset}`;
+      return await sparkServiceClient.executeMySQLQuery(sql, this.jdbcConfig);
     } catch (error) {
       console.error('Error fetching paginated users via Spark:', error);
       throw error;
@@ -101,20 +74,8 @@ class SparkMySQLDataService {
 
   async getUserById(id) {
     try {
-      const query = `
-        CREATE OR REPLACE TEMPORARY VIEW ${this.tempViewName}
-        USING org.apache.spark.sql.jdbc
-        OPTIONS (
-          url '${this.jdbcUrl}',
-          dbtable '${this.tableName}',
-          user '${this.jdbcOptions.user}',
-          password '${this.jdbcOptions.password}',
-          driver '${this.jdbcOptions.driver}'
-        );
-        
-        SELECT * FROM ${this.tempViewName} WHERE id = ${parseInt(id)};
-      `;
-      const results = await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT * FROM ${this.tableName} WHERE id = ${parseInt(id)}`;
+      const results = await sparkServiceClient.executeMySQLQuery(sql, this.jdbcConfig);
       return results[0] || null;
     } catch (error) {
       console.error('Error fetching user by ID via Spark:', error);
@@ -165,16 +126,15 @@ class SparkMySQLDataService {
 
   async healthCheck() {
     try {
-      const sparkHealth = await sparkSessionManager.healthCheck();
+      const isHealthy = await sparkServiceClient.healthCheck();
       const userCount = await this.getUserCount();
       
       return {
-        status: sparkHealth.status === 'healthy' ? 'healthy' : 'error',
-        message: 'SparkMySQLDataService using SparkSession JDBC connector',
-        sparkHealth,
+        status: isHealthy ? 'healthy' : 'error',
+        message: 'SparkMySQLDataService using Spark Service',
+        sparkServiceUrl: sparkServiceClient.baseUrl,
         userCount,
-        jdbcUrl: this.jdbcUrl.replace(/password=[^&]+/, 'password=***'), // Hide password
-        tempView: this.tempViewName
+        jdbcUrl: this.jdbcUrl.replace(/password=[^&]+/, 'password=***') // Hide password
       };
     } catch (error) {
       return {

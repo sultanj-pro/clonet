@@ -1,49 +1,34 @@
-const sparkSessionManager = require('../config/sparkSessionManager');
+const sparkServiceClient = require('../clients/sparkServiceClient');
 const path = require('path');
 
 /**
- * SparkParquetDataService - Access Parquet files using SparkSession
+ * SparkParquetDataService - Access Parquet files using Spark Service
  * 
- * This service uses Spark's native Parquet reader instead of
- * the fs-based JSON file approach used in direct access mode.
+ * This service uses the separate Spark service container via HTTP
+ * to execute queries against Parquet files using Spark's native reader.
  */
 class SparkParquetDataService {
   constructor() {
-    this.dataPath = process.env.PARQUET_PATH || '/app/data/parquet';
+    this.dataPath = process.env.PARQUET_PATH || '/data/parquet';
     this.usersPath = path.join(this.dataPath, 'users');
-    this.tempViewName = 'parquet_users_view';
   }
 
   async initializeService() {
     console.log('Initializing SparkParquetDataService...');
     
-    // Initialize SparkSession
-    await sparkSessionManager.initialize();
-    
-    // Create temporary view for Parquet data
-    await this.createTempView();
+    // Check if Spark service is available
+    const isHealthy = await sparkServiceClient.healthCheck();
+    if (!isHealthy) {
+      throw new Error('Spark service is not available');
+    }
     
     console.log('SparkParquetDataService initialized successfully');
   }
 
-  /**
-   * Create a temporary view pointing to the Parquet directory
-   */
-  async createTempView() {
-    const createViewQuery = `
-      CREATE OR REPLACE TEMPORARY VIEW ${this.tempViewName}
-      USING parquet
-      OPTIONS (path '${this.usersPath}')
-    `;
-
-    await sparkSessionManager.executeSQL(createViewQuery);
-    console.log(`Created temporary view: ${this.tempViewName} from ${this.usersPath}`);
-  }
-
   async getAllUsers() {
     try {
-      const query = `SELECT * FROM ${this.tempViewName}`;
-      return await sparkSessionManager.executeSQL(query);
+      // Path is relative to Spark service container
+      return await sparkServiceClient.executeParquetQuery(this.usersPath);
     } catch (error) {
       console.error('Error fetching users from Parquet via Spark:', error);
       throw error;
@@ -52,12 +37,8 @@ class SparkParquetDataService {
 
   async getPaginatedUsers(limit, offset) {
     try {
-      const query = `
-        SELECT * FROM ${this.tempViewName}
-        ORDER BY id
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      return await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT * FROM parquet_data ORDER BY id LIMIT ${limit} OFFSET ${offset}`;
+      return await sparkServiceClient.executeParquetQuery(this.usersPath, sql);
     } catch (error) {
       console.error('Error fetching paginated users from Parquet via Spark:', error);
       throw error;
@@ -66,8 +47,8 @@ class SparkParquetDataService {
 
   async getUserById(id) {
     try {
-      const query = `SELECT * FROM ${this.tempViewName} WHERE id = ${parseInt(id)}`;
-      const results = await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT * FROM parquet_data WHERE id = ${parseInt(id)}`;
+      const results = await sparkServiceClient.executeParquetQuery(this.usersPath, sql);
       return results[0] || null;
     } catch (error) {
       console.error('Error fetching user by ID from Parquet via Spark:', error);
@@ -77,11 +58,8 @@ class SparkParquetDataService {
 
   async searchUsers(searchTerm) {
     try {
-      const query = `
-        SELECT * FROM ${this.tempViewName}
-        WHERE name LIKE '%${searchTerm}%' OR email LIKE '%${searchTerm}%'
-      `;
-      return await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT * FROM parquet_data WHERE name LIKE '%${searchTerm}%' OR email LIKE '%${searchTerm}%'`;
+      return await sparkServiceClient.executeParquetQuery(this.usersPath, sql);
     } catch (error) {
       console.error('Error searching users in Parquet via Spark:', error);
       throw error;
@@ -90,8 +68,8 @@ class SparkParquetDataService {
 
   async getUserCount() {
     try {
-      const query = `SELECT COUNT(*) as count FROM ${this.tempViewName}`;
-      const results = await sparkSessionManager.executeSQL(query);
+      const sql = `SELECT COUNT(*) as count FROM parquet_data`;
+      const results = await sparkServiceClient.executeParquetQuery(this.usersPath, sql);
       return results[0]?.count || 0;
     } catch (error) {
       console.error('Error getting user count from Parquet via Spark:', error);
@@ -118,16 +96,15 @@ class SparkParquetDataService {
 
   async healthCheck() {
     try {
-      const sparkHealth = await sparkSessionManager.healthCheck();
+      const isHealthy = await sparkServiceClient.healthCheck();
       const userCount = await this.getUserCount();
       
       return {
-        status: sparkHealth.status === 'healthy' ? 'healthy' : 'error',
-        message: 'SparkParquetDataService using SparkSession Parquet reader',
-        sparkHealth,
+        status: isHealthy ? 'healthy' : 'error',
+        message: 'SparkParquetDataService using Spark Service',
+        sparkServiceUrl: sparkServiceClient.baseUrl,
         userCount,
-        dataPath: this.usersPath,
-        tempView: this.tempViewName
+        dataPath: this.usersPath
       };
     } catch (error) {
       return {

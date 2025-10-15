@@ -1,36 +1,8 @@
-# Backend Dockerfile using Apache Spark base image
-FROM apache/spark:3.5.0
-
-# Switch to root to install Node.js
-USER root
-
-# Install Node.js 18
-RUN apt-get update && \
-    apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Backend Dockerfile - Simple Node.js server
+# Spark processing is now handled by the separate spark-service container
+FROM node:18-slim
 
 WORKDIR /app
-
-# Spark is already installed at /opt/spark in this base image
-ENV SPARK_HOME=/opt/spark
-ENV PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
-
-# Download Delta Lake and MySQL JARs (smaller files)
-RUN curl -L -o ${SPARK_HOME}/jars/delta-spark_2.12-3.0.0.jar \
-    https://repo1.maven.org/maven2/io/delta/delta-spark_2.12/3.0.0/delta-spark_2.12-3.0.0.jar && \
-    curl -L -o ${SPARK_HOME}/jars/delta-storage-3.0.0.jar \
-    https://repo1.maven.org/maven2/io/delta/delta-storage/3.0.0/delta-storage-3.0.0.jar && \
-    curl -L -o ${SPARK_HOME}/jars/mysql-connector-j-8.2.0.jar \
-    https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.2.0/mysql-connector-j-8.2.0.jar
-
-# Set Spark configuration for local mode
-ENV SPARK_MASTER=local[*]
-ENV SPARK_DRIVER_MEMORY=1g
-ENV SPARK_EXECUTOR_MEMORY=1g
-ENV SPARK_LOCAL_IP=127.0.0.1
 
 # Copy package files
 COPY package*.json ./
@@ -41,12 +13,8 @@ RUN npm install && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Create data directories
-RUN mkdir -p /app/data/parquet /app/data/delta
-
-# Expose ports
+# Expose port
 EXPOSE 5000
-EXPOSE 4040
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import UserList from './components/UserList';
 import ConfigurationPage from './components/ConfigurationPage';
+import ClonePage from './components/ClonePage';
 import './App.css';
 
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<'users' | 'config'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'config' | 'clone'>('users');
 
   return (
     <div className="App">
@@ -23,10 +24,18 @@ const App: React.FC = () => {
           >
             Configuration
           </button>
+          <button 
+            className={`nav-button ${currentPage === 'clone' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('clone')}
+          >
+            Clone
+          </button>
         </nav>
       </header>
       <main>
-        {currentPage === 'users' ? <UserList /> : <ConfigurationPage />}
+        {currentPage === 'users' && <UserList />}
+        {currentPage === 'config' && <ConfigurationPage />}
+        {currentPage === 'clone' && <ClonePage />}
       </main>
     </div>
   );

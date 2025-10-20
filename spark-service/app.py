@@ -10,6 +10,20 @@ import time
 import logging
 import os
 from config import SPARK_CONFIG, MYSQL_CONFIG
+from clone_service import (
+    test_mysql_connection,
+    get_table_schema,
+    clone_mysql_to_mysql,
+    store_job_status,
+    get_job_status
+)
+from clone_service import (
+    test_mysql_connection,
+    get_table_schema,
+    clone_mysql_to_mysql,
+    store_job_status,
+    get_job_status
+)
 
 # Configure logging
 logging.basicConfig(
@@ -283,6 +297,136 @@ def spark_info():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ========== Clone Service Endpoints ==========
+
+@app.route('/clone/test-mysql', methods=['POST'])
+def test_mysql():
+    """Test MySQL connection and list tables"""
+    try:
+        if spark is None:
+            return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
+        
+        data = request.get_json()
+        host = data.get('host')
+        port = data.get('port', 3306)
+        database = data.get('database')
+        username = data.get('username')
+        password = data.get('password', '')
+        
+        if not all([host, database, username]):
+            return jsonify({
+                'success': False,
+                'message': 'Missing required fields: host, database, username'
+            }), 400
+        
+        logger.info(f"Testing MySQL connection to {host}:{port}/{database}")
+        result = test_mysql_connection(spark, host, port, database, username, password)
+        
+        status_code = 200 if result['success'] else 500
+        return jsonify(result), status_code
+        
+    except Exception as e:
+        logger.error(f"Error in /clone/test-mysql endpoint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/clone/get-schema', methods=['POST'])
+def get_schema():
+    """Get schema for a MySQL table"""
+    try:
+        if spark is None:
+            return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
+        
+        data = request.get_json()
+        host = data.get('host')
+        port = data.get('port', 3306)
+        database = data.get('database')
+        username = data.get('username')
+        password = data.get('password', '')
+        table = data.get('table')
+        
+        if not all([host, database, username, table]):
+            return jsonify({
+                'success': False,
+                'message': 'Missing required fields: host, database, username, table'
+            }), 400
+        
+        logger.info(f"Getting schema for {host}:{port}/{database}.{table}")
+        result = get_table_schema(spark, host, port, database, username, password, table)
+        
+        status_code = 200 if result['success'] else 500
+        return jsonify(result), status_code
+        
+    except Exception as e:
+        logger.error(f"Error in /clone/get-schema endpoint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/clone/execute', methods=['POST'])
+def execute_clone():
+    """Execute clone operation from source to destination MySQL"""
+    try:
+        if spark is None:
+            return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
+        
+        data = request.get_json()
+        source = data.get('source')
+        destination = data.get('destination')
+        options = data.get('options', {'mode': 'overwrite', 'batchSize': 10000})
+        
+        if not source or not destination:
+            return jsonify({
+                'success': False,
+                'message': 'Missing required fields: source, destination'
+            }), 400
+        
+        # Validate source fields
+        required_source = ['host', 'port', 'database', 'username', 'table']
+        if not all(source.get(field) for field in required_source):
+            return jsonify({
+                'success': False,
+                'message': f'Missing required source fields: {required_source}'
+            }), 400
+        
+        # Validate destination fields
+        required_dest = ['host', 'port', 'database', 'username']
+        if not all(destination.get(field) for field in required_dest):
+            return jsonify({
+                'success': False,
+                'message': f'Missing required destination fields: {required_dest}'
+            }), 400
+        
+        logger.info(f"Starting clone: {source['database']}.{source['table']} -> {destination['database']}.{destination.get('table', source['table'])}")
+        
+        result = clone_mysql_to_mysql(spark, source, destination, options)
+        
+        # Store job status for later retrieval
+        if result.get('jobId'):
+            store_job_status(result['jobId'], result)
+        
+        status_code = 200 if result['success'] else 500
+        return jsonify(result), status_code
+        
+    except Exception as e:
+        logger.error(f"Error in /clone/execute endpoint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/clone/status/<job_id>', methods=['GET'])
+def clone_status(job_id):
+    """Get status of a clone job"""
+    try:
+        logger.info(f"Getting status for job {job_id}")
+        result = get_job_status(job_id)
+        
+        status_code = 200 if result.get('success') is not False else 404
+        return jsonify(result), status_code
+        
+    except Exception as e:
+        logger.error(f"Error in /clone/status endpoint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 if __name__ == '__main__':

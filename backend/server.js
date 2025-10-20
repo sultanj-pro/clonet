@@ -12,6 +12,7 @@ const PORT = 5000;
 // Import routes and services
 const userRoutes = require('./routes/users');
 const configRoutes = require('./routes/config');
+const cloneRoutes = require('./routes/clone');
 const { initializeService } = require('./services/serviceManager');
 
 // Middleware
@@ -39,6 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/clone', cloneRoutes);
 
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {

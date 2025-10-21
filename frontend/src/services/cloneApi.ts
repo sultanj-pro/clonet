@@ -1,12 +1,22 @@
 import { API_BASE_URL } from '../config/api';
 
-export interface MySQLConfig {
+export type DatabaseType = 'mysql' | 'sqlserver';
+
+export interface DatabaseConfig {
+  type: DatabaseType;
   host: string;
   port: number;
   database: string;
   username: string;
   password: string;
   table?: string;
+  // SQL Server specific fields
+  instanceName?: string;
+}
+
+// Keep legacy interface for backward compatibility
+export interface MySQLConfig extends Omit<DatabaseConfig, 'type' | 'instanceName'> {
+  type?: 'mysql';
 }
 
 export interface TestConnectionResponse {
@@ -21,8 +31,8 @@ export interface CloneOptions {
 }
 
 export interface CloneRequest {
-  source: MySQLConfig;
-  destination: MySQLConfig;
+  source: DatabaseConfig;
+  destination: DatabaseConfig;
   options: CloneOptions;
 }
 
@@ -43,7 +53,7 @@ export interface SchemaInfo {
   rowCount?: number;
 }
 
-export const testConnection = async (config: MySQLConfig): Promise<TestConnectionResponse> => {
+export const testConnection = async (config: DatabaseConfig): Promise<TestConnectionResponse> => {
   const url = `${API_BASE_URL}/clone/test-connection`;
   console.log('testConnection API called');
   console.log('URL:', url);
@@ -70,7 +80,7 @@ export const testConnection = async (config: MySQLConfig): Promise<TestConnectio
   return result;
 };
 
-export const getSchema = async (config: MySQLConfig): Promise<SchemaInfo> => {
+export const getSchema = async (config: DatabaseConfig): Promise<SchemaInfo> => {
   const response = await fetch(`${API_BASE_URL}/clone/get-schema`, {
     method: 'POST',
     headers: {

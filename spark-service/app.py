@@ -11,19 +11,13 @@ import logging
 import os
 from config import SPARK_CONFIG, MYSQL_CONFIG
 from clone_service import (
-    test_mysql_connection,
+    test_connection,
     get_table_schema,
-    clone_mysql_to_mysql,
+    clone_data,
     store_job_status,
     get_job_status
 )
-from clone_service import (
-    test_mysql_connection,
-    get_table_schema,
-    clone_mysql_to_mysql,
-    store_job_status,
-    get_job_status
-)
+from database_connectors import get_supported_databases
 
 # Configure logging
 logging.basicConfig(
@@ -301,60 +295,89 @@ def spark_info():
 
 # ========== Clone Service Endpoints ==========
 
-@app.route('/clone/test-mysql', methods=['POST'])
-def test_mysql():
-    """Test MySQL connection and list tables"""
+@app.route('/clone/test-connection', methods=['POST'])
+def test_db_connection():
+    """Test database connection and list tables (supports MySQL and SQL Server)"""
     try:
         if spark is None:
             return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
         
         data = request.get_json()
-        host = data.get('host')
-        port = data.get('port', 3306)
-        database = data.get('database')
-        username = data.get('username')
-        password = data.get('password', '')
+        logger.info(f"=== RECEIVED DATA IN /clone/test-connection ===")
+        logger.info(f"Raw data: {data}")
+        logger.info(f"Type field: {data.get('type', 'NOT_SET')}")
         
-        if not all([host, database, username]):
+        db_type = data.get('type', 'mysql')
+        
+        # Validate database type
+        if db_type not in get_supported_databases():
             return jsonify({
                 'success': False,
-                'message': 'Missing required fields: host, database, username'
+                'message': f'Unsupported database type: {db_type}. Supported types: {get_supported_databases()}'
             }), 400
         
-        logger.info(f"Testing MySQL connection to {host}:{port}/{database}")
-        result = test_mysql_connection(spark, host, port, database, username, password)
+        # Validate required fields
+        required_fields = ['host', 'database', 'username']
+        missing_fields = [f for f in required_fields if not data.get(f)]
+        if missing_fields:
+            return jsonify({
+                'success': False,
+                'message': f'Missing required fields: {", ".join(missing_fields)}'
+            }), 400
+        
+        # Set default port if not provided
+        if 'port' not in data:
+            from database_connectors import get_default_port
+            data['port'] = get_default_port(db_type)
+        
+        logger.info(f"Testing {db_type} connection to {data['host']}:{data['port']}/{data['database']}")
+        result = test_connection(spark, data)
         
         status_code = 200 if result['success'] else 500
         return jsonify(result), status_code
         
     except Exception as e:
-        logger.error(f"Error in /clone/test-mysql endpoint: {str(e)}")
+        logger.error(f"Error in /clone/test-connection endpoint: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# Keep backward compatibility
+@app.route('/clone/test-mysql', methods=['POST'])
+def test_mysql():
+    """Legacy endpoint - redirects to test-connection"""
+    data = request.get_json()
+    data['type'] = 'mysql'
+    request._cached_json = (data, data)
+    return test_db_connection()
 
 
 @app.route('/clone/get-schema', methods=['POST'])
 def get_schema():
-    """Get schema for a MySQL table"""
+    """Get schema for a database table (supports MySQL and SQL Server)"""
     try:
         if spark is None:
             return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
         
         data = request.get_json()
-        host = data.get('host')
-        port = data.get('port', 3306)
-        database = data.get('database')
-        username = data.get('username')
-        password = data.get('password', '')
         table = data.get('table')
         
-        if not all([host, database, username, table]):
+        if not table:
             return jsonify({
                 'success': False,
-                'message': 'Missing required fields: host, database, username, table'
+                'message': 'Missing required field: table'
             }), 400
         
-        logger.info(f"Getting schema for {host}:{port}/{database}.{table}")
-        result = get_table_schema(spark, host, port, database, username, password, table)
+        # Validate required fields for connection
+        required_fields = ['host', 'database', 'username']
+        missing_fields = [f for f in required_fields if not data.get(f)]
+        if missing_fields:
+            return jsonify({
+                'success': False,
+                'message': f'Missing required fields: {", ".join(missing_fields)}'
+            }), 400
+        
+        logger.info(f"Getting schema for {data.get('type', 'mysql')} {data['host']}/{data['database']}.{table}")
+        result = get_table_schema(spark, data, table)
         
         status_code = 200 if result['success'] else 500
         return jsonify(result), status_code
@@ -366,7 +389,7 @@ def get_schema():
 
 @app.route('/clone/execute', methods=['POST'])
 def execute_clone():
-    """Execute clone operation from source to destination MySQL"""
+    """Execute clone operation from source to destination (supports MySQL and SQL Server)"""
     try:
         if spark is None:
             return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
@@ -383,7 +406,7 @@ def execute_clone():
             }), 400
         
         # Validate source fields
-        required_source = ['host', 'port', 'database', 'username', 'table']
+        required_source = ['host', 'database', 'username', 'table']
         if not all(source.get(field) for field in required_source):
             return jsonify({
                 'success': False,
@@ -391,16 +414,20 @@ def execute_clone():
             }), 400
         
         # Validate destination fields
-        required_dest = ['host', 'port', 'database', 'username']
+        required_dest = ['host', 'database', 'username']
         if not all(destination.get(field) for field in required_dest):
             return jsonify({
                 'success': False,
                 'message': f'Missing required destination fields: {required_dest}'
             }), 400
         
-        logger.info(f"Starting clone: {source['database']}.{source['table']} -> {destination['database']}.{destination.get('table', source['table'])}")
+        source_type = source.get('type', 'mysql')
+        dest_type = destination.get('type', 'mysql')
         
-        result = clone_mysql_to_mysql(spark, source, destination, options)
+        logger.info(f"Starting clone: {source_type} {source['database']}.{source['table']} -> " +
+                   f"{dest_type} {destination['database']}.{destination.get('table', source['table'])}")
+        
+        result = clone_data(spark, source, destination, options)
         
         # Store job status for later retrieval
         if result.get('jobId'):

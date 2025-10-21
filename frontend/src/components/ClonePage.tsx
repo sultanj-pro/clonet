@@ -1,17 +1,8 @@
 import React, { useState } from 'react';
-import { testConnection as testConnectionAPI, executeClone } from '../services/cloneApi';
+import { testConnection as testConnectionAPI, executeClone, DatabaseConfig, DatabaseType } from '../services/cloneApi';
 import './ClonePage.css';
 
 type ConfigTab = 'source' | 'destination';
-
-interface MySQLConfig {
-  host: string;
-  port: number;
-  database: string;
-  username: string;
-  password: string;
-  table?: string;
-}
 
 interface ConnectionStatus {
   connected: boolean;
@@ -25,11 +16,23 @@ interface CloneOptions {
   batchSize: number;
 }
 
+const getDefaultPort = (dbType: DatabaseType): number => {
+  switch (dbType) {
+    case 'mysql':
+      return 3306;
+    case 'sqlserver':
+      return 1433;
+    default:
+      return 3306;
+  }
+};
+
 const ClonePage: React.FC = () => {
   console.log('ClonePage component rendered');
   
   const [activeTab, setActiveTab] = useState<ConfigTab>('source');
-  const [sourceConfig, setSourceConfig] = useState<MySQLConfig>({
+  const [sourceConfig, setSourceConfig] = useState<DatabaseConfig>({
+    type: 'mysql',
     host: '',
     port: 3306,
     database: '',
@@ -37,7 +40,8 @@ const ClonePage: React.FC = () => {
     password: '',
     table: ''
   });
-  const [destinationConfig, setDestinationConfig] = useState<MySQLConfig>({
+  const [destinationConfig, setDestinationConfig] = useState<DatabaseConfig>({
+    type: 'mysql',
     host: '',
     port: 3306,
     database: '',
@@ -54,16 +58,32 @@ const ClonePage: React.FC = () => {
   const [cloneInProgress, setCloneInProgress] = useState(false);
   const [cloneResult, setCloneResult] = useState<string>('');
 
-  const updateSourceField = (field: keyof MySQLConfig, value: any) => {
-    setSourceConfig({ ...sourceConfig, [field]: value });
+  const updateSourceField = (field: keyof DatabaseConfig, value: any) => {
+    const newConfig = { ...sourceConfig, [field]: value };
+    
+    // Update port if database type changes
+    if (field === 'type') {
+      newConfig.port = getDefaultPort(value as DatabaseType);
+    }
+    
+    setSourceConfig(newConfig);
+    
     // Reset connection status when config changes
     if (field !== 'table') {
       setSourceStatus({ connected: false });
     }
   };
 
-  const updateDestinationField = (field: keyof MySQLConfig, value: any) => {
-    setDestinationConfig({ ...destinationConfig, [field]: value });
+  const updateDestinationField = (field: keyof DatabaseConfig, value: any) => {
+    const newConfig = { ...destinationConfig, [field]: value };
+    
+    // Update port if database type changes
+    if (field === 'type') {
+      newConfig.port = getDefaultPort(value as DatabaseType);
+    }
+    
+    setDestinationConfig(newConfig);
+    
     // Reset connection status when config changes
     if (field !== 'table') {
       setDestinationStatus({ connected: false });
@@ -74,8 +94,8 @@ const ClonePage: React.FC = () => {
     const config = isSource ? sourceConfig : destinationConfig;
     const setStatus = isSource ? setSourceStatus : setDestinationStatus;
     
-    // DEBUG: Enhanced logging - v2.0
-    console.log('=== TEST CONNECTION DEBUG v2.0 ===');
+    // DEBUG: Enhanced logging - v3.0
+    console.log('=== TEST CONNECTION DEBUG v3.0 ===');
     console.log('Testing connection for:', isSource ? 'source' : 'destination');
     console.log('Config values:', {
       host: config.host,
@@ -196,15 +216,27 @@ const ClonePage: React.FC = () => {
   };
 
   const renderConfigForm = (
-    config: MySQLConfig,
+    config: DatabaseConfig,
     isSource: boolean,
     status: ConnectionStatus,
-    updateField: (field: keyof MySQLConfig, value: any) => void
+    updateField: (field: keyof DatabaseConfig, value: any) => void
   ) => {
     const hasRequiredFields = config.host && config.database && config.username;
     
     return (
       <div className="config-form">
+        <div className="form-group">
+          <label htmlFor={`${isSource ? 'source' : 'dest'}-type`}>Database Type *</label>
+          <select
+            id={`${isSource ? 'source' : 'dest'}-type`}
+            value={config.type}
+            onChange={(e) => updateField('type', e.target.value as DatabaseType)}
+            disabled={status.testing}
+          >
+            <option value="mysql">MySQL</option>
+            <option value="sqlserver">SQL Server</option>
+          </select>
+        </div>
         <div className="form-group">
           <label htmlFor={`${isSource ? 'source' : 'dest'}-host`}>Host *</label>
           <input
@@ -226,6 +258,7 @@ const ClonePage: React.FC = () => {
             onChange={(e) => updateField('port', parseInt(e.target.value))}
             disabled={status.testing}
           />
+          <small className="hint">{config.type === 'mysql' ? 'Default: 3306' : 'Default: 1433'}</small>
         </div>
         <div className="form-group">
           <label htmlFor={`${isSource ? 'source' : 'dest'}-database`}>Database *</label>
@@ -239,6 +272,20 @@ const ClonePage: React.FC = () => {
             className={!config.database ? 'required-field' : ''}
           />
         </div>
+        {config.type === 'sqlserver' && (
+          <div className="form-group">
+            <label htmlFor={`${isSource ? 'source' : 'dest'}-instanceName`}>Instance Name</label>
+            <input
+              id={`${isSource ? 'source' : 'dest'}-instanceName`}
+              type="text"
+              value={config.instanceName || ''}
+              onChange={(e) => updateField('instanceName', e.target.value)}
+              placeholder="Optional SQL Server instance"
+              disabled={status.testing}
+            />
+            <small className="hint">Leave empty for default instance</small>
+          </div>
+        )}
         <div className="form-group">
           <label htmlFor={`${isSource ? 'source' : 'dest'}-username`}>Username *</label>
           <input

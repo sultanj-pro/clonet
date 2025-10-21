@@ -12,13 +12,15 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Download Delta Lake and MySQL JARs
+# Download Delta Lake, MySQL, and SQL Server JDBC JARs
 RUN curl -L -o /opt/spark/jars/delta-spark_2.12-3.0.0.jar \
     https://repo1.maven.org/maven2/io/delta/delta-spark_2.12/3.0.0/delta-spark_2.12-3.0.0.jar && \
     curl -L -o /opt/spark/jars/delta-storage-3.0.0.jar \
     https://repo1.maven.org/maven2/io/delta/delta-storage/3.0.0/delta-storage-3.0.0.jar && \
     curl -L -o /opt/spark/jars/mysql-connector-j-8.2.0.jar \
-    https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.2.0/mysql-connector-j-8.2.0.jar
+    https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.2.0/mysql-connector-j-8.2.0.jar && \
+    curl -L -o /opt/spark/jars/mssql-jdbc-12.4.2.jre8.jar \
+    https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/12.4.2.jre8/mssql-jdbc-12.4.2.jre8.jar
 
 # Copy requirements and install Python packages
 COPY requirements.txt .

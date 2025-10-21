@@ -96,6 +96,8 @@ services:
       MYSQL_DATABASE: clonet_db
       MYSQL_USER: clonet_user
       MYSQL_PASSWORD: clonet_password
+    ports:
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -103,6 +105,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clonet-network
+
+  sqlserver:
+    container_name: clonet-sqlserver
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Password123!"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "Password123!", "-C", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - clonet-network
 
@@ -114,3 +137,4 @@ volumes:
   frontend_node_modules:
   backend_node_modules:
   mysql_data:
+  sqlserver_data:

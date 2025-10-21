@@ -3,27 +3,27 @@ const fetch = require('node-fetch');
 const SPARK_SERVICE_URL = process.env.SPARK_SERVICE_URL || 'http://spark-service:8000';
 
 /**
- * Test MySQL connection and list available tables
+ * Test database connection and list available tables (supports MySQL and SQL Server)
  */
 const testConnection = async (req, res) => {
   try {
-    const { host, port, database, username, password } = req.body;
+    const { type, host, port, database, username, password, instanceName } = req.body;
 
     // Validate required fields
-    if (!host || !port || !database || !username) {
+    if (!host || !database || !username) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: host, port, database, username'
+        message: 'Missing required fields: host, database, username'
       });
     }
 
-    // Forward request to Spark service
-    const response = await fetch(`${SPARK_SERVICE_URL}/clone/test-mysql`, {
+    // Forward request to Spark service with all fields
+    const response = await fetch(`${SPARK_SERVICE_URL}/clone/test-connection`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ host, port, database, username, password }),
+      body: JSON.stringify({ type, host, port, database, username, password, instanceName }),
     });
 
     const data = await response.json();

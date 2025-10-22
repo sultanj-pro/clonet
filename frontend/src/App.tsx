@@ -4,8 +4,10 @@ import ConfigurationPage from './components/ConfigurationPage';
 import ClonePage from './components/ClonePage';
 import './App.css';
 
+import ConnectionsPage from './components/ConnectionsPage';
+
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<'users' | 'config' | 'clone'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'config' | 'clone' | 'connections'>('users');
 
   return (
     <div className="App">
@@ -30,12 +32,19 @@ const App: React.FC = () => {
           >
             Clone
           </button>
+          <button 
+            className={`nav-button ${currentPage === 'connections' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('connections')}
+          >
+            Connections
+          </button>
         </nav>
       </header>
       <main>
         {currentPage === 'users' && <UserList />}
         {currentPage === 'config' && <ConfigurationPage />}
         {currentPage === 'clone' && <ClonePage />}
+        {currentPage === 'connections' && <ConnectionsPage />}
       </main>
     </div>
   );

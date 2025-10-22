@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import ConnectionDialog from './ConnectionDialog';
+import './ConnectionsPage.css';
 import { DatabaseConfig, DatabaseType, testConnection } from '../services/cloneApi';
+import { getConnections, addConnection, updateConnection, deleteConnection } from '../services/connectionsApi';
 
-interface ConnectionConfig extends DatabaseConfig {
-  name: string;
-}
+// ...existing code...
+import { ConnectionConfig } from '../services/connectionsApi';
 
 const defaultConfig: ConnectionConfig = {
   name: '',
@@ -18,93 +20,89 @@ const defaultConfig: ConnectionConfig = {
 
 const ConnectionsPage: React.FC = () => {
   const [connections, setConnections] = useState<ConnectionConfig[]>([]);
-  // Load connections from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('db_connections');
-    if (saved) {
-      setConnections(JSON.parse(saved));
-    }
+    getConnections()
+      .then(data => {
+        // Remap backend fields to frontend fields
+        const mapped = data.map(conn => ({
+          ...conn,
+          database: conn.db_name || conn.database || '',
+          username: conn.user || conn.username || '',
+        }));
+        setConnections(mapped);
+      })
+      .catch(() => setConnections([]));
   }, []);
-
-  // Save connections to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('db_connections', JSON.stringify(connections));
-  }, [connections]);
   const [form, setForm] = useState<ConnectionConfig>(defaultConfig);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState<boolean>(false);
+  const [editForm, setEditForm] = useState<ConnectionConfig | null>(null);
   const [testStatus, setTestStatus] = useState<{[key: number]: string}>({});
+  const [newTestStatus, setNewTestStatus] = useState<string>('');
+  const [showAddDialog, setShowAddDialog] = useState<boolean>(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: name === 'port' ? Number(value) : value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name) return;
-    // Prevent duplicate names
     if (connections.some((c, i) => c.name === form.name && i !== editingIndex)) {
       alert('Connection name must be unique.');
       return;
     }
-    if (editingIndex !== null) {
-      const updated = [...connections];
-      updated[editingIndex] = form;
-      setConnections(updated);
-      setEditingIndex(null);
-    } else {
-      setConnections([...connections, form]);
+    try {
+      if (editingIndex !== null) {
+        const id = (connections[editingIndex] as any).id;
+        await updateConnection(id, form);
+        const updated = [...connections];
+        updated[editingIndex] = { ...form, id };
+        setConnections(updated);
+        setEditingIndex(null);
+      } else {
+        const result = await addConnection(form);
+        setConnections([...connections, { ...form, id: result.id }]);
+      }
+      setForm(defaultConfig);
+    } catch (err) {
+      alert('Failed to save connection');
     }
-    setForm(defaultConfig);
   };
 
   const handleEdit = (idx: number) => {
-    setForm(connections[idx]);
+    setEditForm(connections[idx]);
     setEditingIndex(idx);
+    setShowEditDialog(true);
+  };
+  const handleCancelEdit = () => {
+    setForm(defaultConfig);
+    setEditingIndex(null);
+    setNewTestStatus('');
   };
 
-  const handleDelete = (idx: number) => {
-    setConnections(connections.filter((_, i) => i !== idx));
-    if (editingIndex === idx) {
-      setForm(defaultConfig);
-      setEditingIndex(null);
-    }
-  };
-
-  const handleTestConnection = async (idx: number) => {
-    setTestStatus(prev => ({ ...prev, [idx]: 'Testing...' }));
+  const handleDelete = async (idx: number) => {
+    const id = (connections[idx] as any).id;
     try {
-      const { name, ...configToTest } = connections[idx];
-      const result = await testConnection(configToTest);
-      if (result.success) {
-        setTestStatus(prev => ({ ...prev, [idx]: 'Success' }));
-      } else {
-        setTestStatus(prev => ({ ...prev, [idx]: 'Failed: ' + (result.message || 'Unknown error') }));
+      await deleteConnection(id);
+      const updated = connections.filter((_, i) => i !== idx);
+      setConnections(updated);
+      if (editingIndex === idx) {
+        setForm(defaultConfig);
+        setEditingIndex(null);
       }
-    } catch (err: any) {
-      setTestStatus(prev => ({ ...prev, [idx]: 'Failed: ' + (err.message || 'Error') }));
+    } catch (err) {
+      alert('Failed to delete connection');
     }
   };
+
+  // ...existing code...
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className="connections-page-container">
       <h2>Manage Connections</h2>
-      <div style={{ marginBottom: 24 }}>
-        <input name="name" placeholder="Connection Name" value={form.name} onChange={handleChange} />
-        <select name="type" value={form.type} onChange={handleChange} aria-label="Database Type">
-          <option value="mysql">MySQL</option>
-          <option value="sqlserver">SQL Server</option>
-        </select>
-        <input name="host" placeholder="Host" value={form.host} onChange={handleChange} />
-        <input name="port" type="number" placeholder="Port" value={form.port} onChange={handleChange} />
-        <input name="database" placeholder="Database" value={form.database} onChange={handleChange} />
-        <input name="username" placeholder="Username" value={form.username} onChange={handleChange} />
-        <input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} />
-        {form.type === 'sqlserver' && (
-          <input name="instanceName" placeholder="Instance Name (SQL Server)" value={form.instanceName} onChange={handleChange} />
-        )}
-        <button onClick={handleSave}>{editingIndex !== null ? 'Update' : 'Add'} Connection</button>
-      </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <button onClick={() => setShowAddDialog(true)} className="add-connection-btn">Add Connection</button>
+      <table className="connections-table">
         <thead>
           <tr>
             <th>Name</th>
@@ -124,22 +122,77 @@ const ConnectionsPage: React.FC = () => {
               <td>{conn.type}</td>
               <td>{conn.host}</td>
               <td>{conn.port}</td>
-              <td>{conn.database}</td>
-              <td>{conn.username}</td>
+              <td>{conn.db_name || conn.database}</td>
+              <td>{conn.user || conn.username}</td>
               <td>
                 <button onClick={() => handleEdit(idx)}>Edit</button>
                 <button onClick={() => handleDelete(idx)}>Delete</button>
               </td>
               <td>
-                <button onClick={() => handleTestConnection(idx)}>Test</button>
-                <span style={{ marginLeft: 8 }}>{testStatus[idx]}</span>
+                <button
+                  onClick={async () => {
+                    const config = {
+                      type: conn.type,
+                      host: conn.host,
+                      port: conn.port,
+                      database: conn.db_name || conn.database,
+                      username: conn.user || conn.username,
+                      password: conn.password,
+                      instanceName: conn.instanceName,
+                    };
+                    setTestStatus(prev => ({ ...prev, [idx]: 'Testing...' }));
+                    try {
+                      const result = await testConnection(config);
+                      setTestStatus(prev => ({ ...prev, [idx]: result.success ? 'Success' : 'Fail' }));
+                    } catch {
+                      setTestStatus(prev => ({ ...prev, [idx]: 'Fail' }));
+                    }
+                  }}
+                >Test</button>
+                <span className="test-status" style={{ marginLeft: 8 }}>{testStatus[idx]}</span>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {showAddDialog && (
+        <ConnectionDialog
+          open={showAddDialog}
+          onClose={() => setShowAddDialog(false)}
+          onSave={async config => {
+            try {
+              const result = await addConnection(config as any);
+              setConnections([...connections, { ...config, id: result.id }]);
+              setShowAddDialog(false);
+            } catch {
+              alert('Failed to add connection');
+            }
+          }}
+        />
+      )}
+      {showEditDialog && editForm && (
+        <ConnectionDialog
+          open={showEditDialog}
+          initialValues={editForm}
+          onClose={() => setShowEditDialog(false)}
+          onSave={async config => {
+            if (editingIndex !== null) {
+              const id = (connections[editingIndex] as any).id;
+              try {
+                await updateConnection(id, config as any);
+                const updated = [...connections];
+                updated[editingIndex] = { ...config, id };
+                setConnections(updated);
+                setShowEditDialog(false);
+              } catch {
+                alert('Failed to update connection');
+              }
+            }
+          }}
+        />
+      )}
     </div>
   );
-};
 
+}
 export default ConnectionsPage;

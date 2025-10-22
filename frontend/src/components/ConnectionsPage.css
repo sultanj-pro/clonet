@@ -1,0 +1,30 @@
+.connections-page-container {
+  padding: 24px;
+}
+
+.connections-form-container {
+  margin-bottom: 24px;
+}
+.connections-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.connections-table th,
+.connections-table td {
+  padding: 8px;
+  border: 1px solid #ddd;
+}
+
+.connections-table th {
+  background: #f4f4f4;
+  color: #333;
+}
+
+.test-status {
+  margin-left: 8px;
+}
+
+.test-btn {
+  margin-right: 8px;
+}

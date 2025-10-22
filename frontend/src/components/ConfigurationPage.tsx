@@ -1,244 +1,191 @@
-import React, { useState, useEffect } from 'react';
-import { getStorageConfig, updateStorageConfig } from '../services';
-import Loading from './Loading';
-import './ConfigurationPage.css';
 
-const ConfigurationPage: React.FC = () => {
-  const [storageType, setStorageType] = useState<'mysql' | 'parquet' | 'delta'>('mysql');
-  const [accessMethod, setAccessMethod] = useState<'direct' | 'sparksession'>('direct');
-  const [configLabel, setConfigLabel] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState<string>('');
+import ConnectionsPage from './ConnectionsPage';
+import React, { useState } from 'react';
 
-  useEffect(() => {
-    loadConfiguration();
+const JDBCSettingsForm: React.FC = () => {
+  const [form, setForm] = useState({
+    host: '',
+    port: '',
+    user: '',
+    password: '',
+    database: 'app_data',
+  });
+
+  React.useEffect(() => {
+    // Load persisted JDBC config from backend
+    fetch('/api/jdbc')
+      .then(res => res.json())
+      .then(data => {
+        if (data.host && data.port && data.user && data.password && data.database) {
+          setForm({
+            host: data.host,
+            port: data.port,
+            user: data.user,
+            password: data.password,
+            database: data.database,
+          });
+          setStatus(`Configured for ${data.host}:${data.port}/${data.database}`);
+          setConfigured(true);
+          setEditMode(false);
+        } else {
+          setConfigured(false);
+        }
+      })
+      .catch(() => {});
   }, []);
+              const [configured, setConfigured] = useState<boolean>(false);
+              const [editMode, setEditMode] = useState<boolean>(false);
+  const [status, setStatus] = useState<string>('Not configured');
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const loadConfiguration = async () => {
-    try {
-      setIsLoading(true);
-      const config = await getStorageConfig();
-      setStorageType(config.type);
-      setAccessMethod(config.accessMethod || 'direct');
-      setConfigLabel(config.label || '');
-      setError('');
-    } catch (err) {
-      setError('Failed to load configuration');
-      console.error('Error loading configuration:', err);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleConfigurationChange = async (
-    newType?: 'mysql' | 'parquet' | 'delta',
-    newAccessMethod?: 'direct' | 'sparksession'
-  ) => {
+  const handleSave = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
     try {
-      setIsLoading(true);
-      setError('');
-      setSuccessMessage('');
-      
-      const targetType = newType || storageType;
-      const targetAccessMethod = newAccessMethod || accessMethod;
-      
-      // Special warning for SparkSession mode
-      if (targetAccessMethod === 'sparksession') {
-        setSuccessMessage(`Attempting to switch to ${targetType} via SparkSession (requires Apache Spark installed)...`);
-      } else {
-        setSuccessMessage(`Switching to ${targetType} via ${targetAccessMethod}...`);
-      }
-
-      const response = await updateStorageConfig({ 
-        type: targetType,
-        accessMethod: targetAccessMethod
+      const response = await fetch('/api/jdbc', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
       });
-      
-      // Check if the server actually switched to the requested mode
-      if (response.accessMethod === targetAccessMethod) {
-        setStorageType(response.type);
-        setAccessMethod(response.accessMethod || 'direct');
-        setConfigLabel(response.label || '');
-        setSuccessMessage(`Successfully switched to ${response.label || targetType}`);
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess(data.message || 'JDBC settings saved and validated successfully!');
+        setStatus(`Configured for ${form.host}:${form.port}/${form.database}`);
+        setConfigured(true);
+        setEditMode(false);
       } else {
-        // Server couldn't switch (likely Spark not installed)
-        setError(
-          `Cannot switch to SparkSession mode: Apache Spark is not installed in the backend container. ` +
-          `The application remains in ${response.label || 'Direct Access'} mode. ` +
-          `See CURRENT_STATUS.md for instructions on enabling SparkSession.`
-        );
-        // Update to actual server state
-        setStorageType(response.type);
-        setAccessMethod(response.accessMethod || 'direct');
-        setConfigLabel(response.label || '');
+        setError(data.error || 'Failed to save JDBC settings.');
       }
-      
-      // Clear success message after 5 seconds
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 5000);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update storage configuration';
-      
-      // Enhanced error message for SparkSession failures
-      if (errorMessage.includes('Spark') || errorMessage.includes('sparksession')) {
-        setError(
-          `SparkSession mode is not available: Apache Spark is not installed. ` +
-          `The application is running in Direct Access mode. ` +
-          `Error details: ${errorMessage}`
-        );
-      } else {
-        setError(errorMessage);
+      let message = 'Unknown error';
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (typeof err === 'object' && err && 'message' in err) {
+        message = (err as any).message;
+      } else if (typeof err === 'string') {
+        message = err;
       }
-      
-      console.error('Error updating configuration:', err);
-      
-      // Reload to get current state
-      await loadConfiguration();
-    } finally {
-      setIsLoading(false);
+  setError('Network error: ' + message);
     }
+    setLoading(false);
   };
 
-  if (isLoading) {
+  if (typeof configured !== 'undefined' && configured && typeof editMode !== 'undefined' && !editMode) {
     return (
-      <div className="configuration-page">
-        <Loading text="Updating configuration..." />
+      <div className="jdbc-configured">
+        <div className="app-db-status">
+          <strong>Current JDBC Storage:</strong> {status}
+        </div>
+        <button type="button" className="edit-jdbc-btn" onClick={() => setEditMode(true)}>
+          Edit JDBC Settings
+        </button>
       </div>
     );
   }
+  return (
+    <form className="jdbc-settings-form" onSubmit={e => e.preventDefault()}>
+      <div className="form-row">
+        <label htmlFor="jdbc-host">Host/Server:</label>
+        <input type="text" id="jdbc-host" name="host" value={form.host} onChange={handleChange} placeholder="e.g. mysql, sqlserver, or IP" />
+      </div>
+      <div className="form-row">
+        <label htmlFor="jdbc-port">Port:</label>
+        <input type="number" id="jdbc-port" name="port" value={form.port} onChange={handleChange} placeholder="e.g. 3306 or 1433" />
+      </div>
+      <div className="form-row">
+        <label htmlFor="jdbc-user">User:</label>
+        <input type="text" id="jdbc-user" name="user" value={form.user} onChange={handleChange} placeholder="Database user" />
+      </div>
+      <div className="form-row">
+        <label htmlFor="jdbc-password">Password:</label>
+        <input type="password" id="jdbc-password" name="password" value={form.password} onChange={handleChange} placeholder="Database password" />
+      </div>
+      <div className="form-row">
+        <label htmlFor="jdbc-database">Database Name:</label>
+        <input type="text" id="jdbc-database" name="database" value={form.database} readOnly />
+      </div>
+      <div className="form-actions">
+        <button type="button" className="save-jdbc-btn" onClick={handleSave} disabled={loading}>
+          {loading ? 'Saving...' : 'Save JDBC Settings'}
+        </button>
+        <button type="button" className="cancel-jdbc-btn" onClick={() => setEditMode(false)}>
+          Cancel
+        </button>
+      </div>
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
+      <div className="app-db-info">
+        <p><strong>JDBC Storage:</strong> Use any JDBC-compatible database (e.g., MySQL, SQL Server). Enter the connection details above. The database will be created if it does not exist.</p>
+      </div>
+    </form>
+  );
+};
+
+const ConfigurationPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'settings' | 'connections' | 'jobs'>('settings');
 
   return (
     <div className="configuration-page">
-      <h2>System Configuration</h2>
-      
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
-      
-      {successMessage && (
-        <div className="success-message">
-          {successMessage}
-        </div>
-      )}
-
-      <div className="config-section">
-        <h3>Current Configuration</h3>
-        <div className="current-config">
-          <strong>{configLabel || `${storageType} via ${accessMethod}`}</strong>
-        </div>
+      <h2>Configuration</h2>
+      <div className="config-tabs">
+        <button
+          className={`config-tab ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Application Settings
+        </button>
+        <button
+          className={`config-tab ${activeTab === 'connections' ? 'active' : ''}`}
+          onClick={() => setActiveTab('connections')}
+        >
+          Connections
+        </button>
+        <button
+          className={`config-tab ${activeTab === 'jobs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('jobs')}
+        >
+          Job Scheduling
+        </button>
       </div>
 
-      <div className="config-section">
-        <h3>Storage Type</h3>
-        <div className="storage-options">
-          <div className="storage-option">
-            <input
-              type="radio"
-              id="mysql"
-              name="storageType"
-              value="mysql"
-              checked={storageType === 'mysql'}
-              onChange={() => handleConfigurationChange('mysql', undefined)}
-            />
-            <label htmlFor="mysql">
-              <strong>MySQL Database</strong>
-              <p>Traditional relational database storage</p>
-            </label>
+      <div className="config-content">
+        {activeTab === 'settings' && (
+          <div>
+            <h3>Application Settings</h3>
+            <p>Manage global application settings here.</p>
+            <div className="app-db-settings">
+              <h4>Application Database Settings</h4>
+              <p>Configure JDBC storage for application data (settings, connections, jobs):</p>
+              <JDBCSettingsForm />
+            </div>
           </div>
-
-          <div className="storage-option">
-            <input
-              type="radio"
-              id="parquet"
-              name="storageType"
-              value="parquet"
-              checked={storageType === 'parquet'}
-              onChange={() => handleConfigurationChange('parquet', undefined)}
-            />
-            <label htmlFor="parquet">
-              <strong>Parquet Files</strong>
-              <p>Efficient columnar storage format for analytics</p>
-            </label>
+        )}
+        {activeTab === 'connections' && (
+          <div>
+            <ConnectionsPage />
           </div>
-
-          <div className="storage-option">
-            <input
-              type="radio"
-              id="delta"
-              name="storageType"
-              value="delta"
-              checked={storageType === 'delta'}
-              onChange={() => handleConfigurationChange('delta', undefined)}
-            />
-            <label htmlFor="delta">
-              <strong>Delta Table Format</strong>
-              <p>ACID-compliant storage with Parquet files and transaction logs</p>
-            </label>
+        )}
+        {activeTab === 'jobs' && (
+          <div>
+            {/* Job Scheduling UI placeholder */}
+            <h3>Job Scheduling</h3>
+            <p>Configure and manage scheduled jobs here. (Coming soon)</p>
           </div>
-        </div>
-      </div>
-
-      <div className="config-section">
-        <h3>Data Access Method</h3>
-        <div className="access-method-options">
-          <div className="access-method-option">
-            <input
-              type="radio"
-              id="direct"
-              name="accessMethod"
-              value="direct"
-              checked={accessMethod === 'direct'}
-              onChange={() => handleConfigurationChange(undefined, 'direct')}
-            />
-            <label htmlFor="direct">
-              <strong>Direct Access</strong>
-              <p>Direct library access (mysql2, fs modules)</p>
-            </label>
-          </div>
-
-          <div className="access-method-option">
-            <input
-              type="radio"
-              id="sparksession"
-              name="accessMethod"
-              value="sparksession"
-              checked={accessMethod === 'sparksession'}
-              onChange={() => handleConfigurationChange(undefined, 'sparksession')}
-            />
-            <label htmlFor="sparksession">
-              <strong>SparkSession ⚠️</strong>
-              <p>Apache Spark unified SQL interface (read-only) - Requires Spark installation</p>
-              <p style={{color: '#856404', fontSize: '0.85em', marginTop: '5px', fontStyle: 'italic'}}>
-                Note: Currently unavailable - Spark binaries not installed in backend container
-              </p>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="config-section">
-        <div className="storage-info">
-          <h4>About Your Configuration</h4>
-          <p className="storage-description">
-            {storageType === 'mysql' 
-              ? 'MySQL is a traditional relational database ideal for transactional data and real-time operations.'
-              : storageType === 'parquet'
-              ? 'Parquet files provide efficient columnar storage optimized for analytical queries and big data workloads.'
-              : 'Delta Table Format combines Parquet files with transaction logs for ACID compliance, versioning, and time travel.'}
-          </p>
-          <p className="access-description">
-            {accessMethod === 'direct'
-              ? 'Direct access uses native Node.js libraries for maximum write performance and simplicity.'
-              : 'SparkSession provides a unified SQL interface via Apache Spark in local mode. Currently read-only.'}
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default ConfigurationPage;
+  export default ConfigurationPage;
+

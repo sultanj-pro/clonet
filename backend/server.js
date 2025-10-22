@@ -13,6 +13,8 @@ const PORT = 5000;
 const userRoutes = require('./routes/users');
 const configRoutes = require('./routes/config');
 const cloneRoutes = require('./routes/clone');
+const jdbcConfigRoutes = require('./routes/jdbcConfig');
+const connectionsRoutes = require('./routes/connections');
 const { initializeService } = require('./services/serviceManager');
 
 // Middleware
@@ -41,6 +43,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/users', userRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/clone', cloneRoutes);
+app.use('/api/jdbc', jdbcConfigRoutes);
+app.use('/api/connections', connectionsRoutes);
 
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {

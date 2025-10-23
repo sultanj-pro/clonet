@@ -25,7 +25,8 @@
     "mysql2": "^2.3.3",
     "node-fetch": "^2.7.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0"
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "mocha": "^11.7.4",

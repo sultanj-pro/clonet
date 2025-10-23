@@ -23,11 +23,12 @@ const ConnectionsPage: React.FC = () => {
   useEffect(() => {
     getConnections()
       .then(data => {
+        console.log('Backend response for connections:', data); // Log backend response for investigation
         // Remap backend fields to frontend fields
         const mapped = data.map(conn => ({
           ...conn,
           database: conn.db_name || conn.database || '',
-          username: conn.user || conn.username || '',
+          username: conn.username || conn.user || '',
         }));
         setConnections(mapped);
       })
@@ -43,7 +44,7 @@ const ConnectionsPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: name === 'port' ? Number(value) : value }));
+  setForm((prev: ConnectionConfig) => ({ ...prev, [name]: name === 'port' ? Number(value) : value }));
   };
 
   const handleSave = async () => {

@@ -3,6 +3,7 @@ import { DatabaseConfig, testConnection } from '../services/cloneApi';
 
 interface ConnectionConfig extends DatabaseConfig {
   name: string;
+  username: string;
 }
 
 interface ConnectionDialogProps {
@@ -44,8 +45,8 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onSa
   const handleTest = async () => {
     setTestStatus('Testing...');
     try {
-      const { name, ...configToTest } = form;
-      const result = await testConnection(configToTest);
+    const { name, ...configToTest } = form;
+    const result = await testConnection({ ...configToTest });
       setTested(true);
       if (result.success) {
         setTestStatus('Success');
@@ -82,18 +83,26 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onSa
         <input name="host" placeholder="Host" value={form.host} onChange={handleChange} />
         <input name="port" type="number" placeholder="Port" value={form.port} onChange={handleChange} />
         <input name="database" placeholder="Database" value={form.database} onChange={handleChange} />
-        <input name="username" placeholder="Username" value={form.username} onChange={handleChange} />
+        <input
+          type="text"
+          name="username"
+          value={form.username || ''}
+          onChange={handleChange}
+          required
+          placeholder="Username"
+          title="Username"
+        />
         <input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} />
         {form.type === 'sqlserver' && (
           <input name="instanceName" placeholder="Instance Name (SQL Server)" value={form.instanceName} onChange={handleChange} />
         )}
-        <div style={{ marginTop: 16 }}>
+        <div className="connection-dialog-actions">
           <button onClick={handleTest} disabled={!isFormFilled}>Test</button>
-          <span className="test-status" style={{ marginLeft: 8 }}>{testStatus}</span>
+          <span className="test-status test-status-margin">{testStatus}</span>
         </div>
-        <div style={{ marginTop: 16 }}>
+        <div className="connection-dialog-actions">
           <button onClick={handleSave} disabled={!testSuccess}>Save</button>
-          <button onClick={onClose} style={{ marginLeft: 8 }}>Cancel</button>
+          <button onClick={onClose} className="cancel-btn-margin">Cancel</button>
         </div>
       </div>
     </div>

@@ -16,10 +16,11 @@ exports.getConnections = async (req, res) => {
 // Add a new connection
 exports.addConnection = async (req, res) => {
   const { name, host, port, user, password, database, type } = req.body;
+  // INVESTIGATION: Username field handling
   try {
     const pool = mysql.createPool(dbConfig);
     const [result] = await pool.query(
-      'INSERT INTO connections (name, host, port, user, password, db_name, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO connections (name, host, port, username, password, db_name, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, host, port, user, password, database, type]
     );
     await pool.end();
@@ -33,10 +34,11 @@ exports.addConnection = async (req, res) => {
 exports.updateConnection = async (req, res) => {
   const { id } = req.params;
   const { name, host, port, user, password, database, type } = req.body;
+  // INVESTIGATION: Username field handling
   try {
     const pool = mysql.createPool(dbConfig);
     await pool.query(
-      'UPDATE connections SET name=?, host=?, port=?, user=?, password=?, db_name=?, type=? WHERE id=?',
+        'UPDATE connections SET name=?, host=?, port=?, username=?, password=?, db_name=?, type=? WHERE id=?',
       [name, host, port, user, password, database, type, id]
     );
     await pool.end();

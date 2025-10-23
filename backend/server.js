@@ -1,16 +1,14 @@
 const express = require('express');
+const { swaggerUi, swaggerSpec } = require('./swagger');
+const app = express();
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
-const { swaggerUi, specs } = require('./config/swagger');
-
-const app = express();
-const PORT = 5000;
-
 // Import routes and services
 const userRoutes = require('./routes/users');
+// Note: Ensure that 'user' is consistently referred to as 'username' in the userRoutes
 const configRoutes = require('./routes/config');
 const cloneRoutes = require('./routes/clone');
 const jdbcConfigRoutes = require('./routes/jdbcConfig');
@@ -18,6 +16,8 @@ const connectionsRoutes = require('./routes/connections');
 const { initializeService } = require('./services/serviceManager');
 
 // Middleware
+// Swagger UI setup
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginEmbedderPolicy: false,
@@ -46,13 +46,6 @@ app.use('/api/clone', cloneRoutes);
 app.use('/api/jdbc', jdbcConfigRoutes);
 app.use('/api/connections', connectionsRoutes);
 
-// Swagger Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-  explorer: true,
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "Clonet API Documentation"
-}));
-
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -79,10 +72,10 @@ app.use('*', (req, res) => {
 // Initialize data service before starting server
 initializeService().then(() => {
   if (process.env.NODE_ENV !== 'test') {
+    const PORT = process.env.PORT || 5000;
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`Swagger documentation: http://localhost:${PORT}/api-docs`);
     }).on('error', (error) => {
       console.error('Failed to start server:', error);
       process.exit(1);

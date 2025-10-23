@@ -4,6 +4,8 @@ import { DatabaseConfig } from './cloneApi';
 export interface ConnectionConfig extends DatabaseConfig {
   id?: number;
   name: string;
+  db_name?: string; // Added for backend compatibility
+  user?: string;    // Added for backend compatibility
 }
 
 export const getConnections = async (): Promise<ConnectionConfig[]> => {
@@ -21,7 +23,7 @@ export const addConnection = async (config: ConnectionConfig): Promise<{ id: num
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify(config),
+    body: JSON.stringify({ ...config, user: config.user }),
   });
   if (!response.ok) throw new Error('Failed to add connection');
   return response.json();
@@ -32,7 +34,7 @@ export const updateConnection = async (id: number, config: ConnectionConfig): Pr
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify(config),
+    body: JSON.stringify({ ...config, user: config.user }),
   });
   if (!response.ok) throw new Error('Failed to update connection');
 };

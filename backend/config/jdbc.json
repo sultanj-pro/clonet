@@ -1,7 +1,7 @@
 {
   "host": "sqlserver",
   "port": "1433",
-  "user": "conet_db",
+  "user": "sa",
   "password": "Password123!",
   "database": "app_data"
 }

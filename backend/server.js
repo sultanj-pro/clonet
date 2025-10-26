@@ -6,7 +6,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const { swaggerUi, swaggerSpec } = require('./swagger');
 
-const configRoutes = require('./routes/config');
 const cloneRoutes = require('./routes/clone');
 const connectionsRoutes = require('./routes/connections');
 const { initializeService } = require('./services/serviceManager');
@@ -36,8 +35,7 @@ app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes (Application DB config removed - using MySQL via .env)
-app.use('/api/config', configRoutes);
+// Routes
 app.use('/api/clone', cloneRoutes);
 app.use('/api/connections', connectionsRoutes);
 

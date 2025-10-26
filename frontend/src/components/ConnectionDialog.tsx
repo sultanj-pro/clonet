@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { DatabaseConfig, testConnection } from '../services/cloneApi';
+import { testConnection } from '../services/connectionsApi';
+import { DatabaseConfig } from '../services/cloneApi';
 
 interface ConnectionConfig extends DatabaseConfig {
   name: string;

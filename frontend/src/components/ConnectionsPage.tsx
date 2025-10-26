@@ -31,7 +31,7 @@ const ConnectionsPage: React.FC = () => {
         const mapped = data.map(conn => ({
           ...conn,
           database: conn.db_name || conn.database || '',
-          username: conn.username || conn.user || '',
+          username: conn.username || '',
         }));
         setConnections(mapped);
       })
@@ -127,7 +127,7 @@ const ConnectionsPage: React.FC = () => {
               <td>{conn.host}</td>
               <td>{conn.port}</td>
               <td>{conn.db_name || conn.database}</td>
-              <td>{conn.user || conn.username}</td>
+              <td>{conn.username}</td>
               <td>
                 <button onClick={() => handleEdit(idx)}>Edit</button>
                 <button onClick={() => handleDelete(idx)}>Delete</button>
@@ -140,7 +140,7 @@ const ConnectionsPage: React.FC = () => {
                       host: conn.host,
                       port: conn.port,
                       database: conn.db_name || conn.database,
-                      username: conn.user || conn.username,
+                      username: conn.username,
                       password: conn.password,
                       instanceName: conn.instanceName,
                     };

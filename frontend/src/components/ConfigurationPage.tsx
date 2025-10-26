@@ -32,8 +32,8 @@ const AppDatabaseSettingsForm: React.FC = () => {
       })
       .catch(() => {});
   }, []);
-              const [configured, setConfigured] = useState<boolean>(false);
-              const [editMode, setEditMode] = useState<boolean>(false);
+  const [configured, setConfigured] = useState<boolean>(false);
+  const [editMode, setEditMode] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('Not configured');
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
@@ -111,7 +111,7 @@ const AppDatabaseSettingsForm: React.FC = () => {
       </div>
       <div className="form-row">
         <label htmlFor="appdb-database">Database Name:</label>
-        <input type="text" id="appdb-database" name="database" value={form.database} readOnly />
+        <input type="text" id="appdb-database" name="database" value={form.database} placeholder="Database name" disabled={!editMode} />
       </div>
       <div className="form-actions">
         <button type="button" className="save-jdbc-btn" onClick={handleSave} disabled={loading}>

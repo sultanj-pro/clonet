@@ -1,3 +1,6 @@
+// ANALYSIS: Reviewing add connection payload and form validation for username field.
+// ANALYSIS: Add Connection logic is handled below. Reviewing for error source.
+// TODO: Review the Add Connection logic here for troubleshooting the 'Failed to add connection' error.
 import React, { useState, useEffect } from 'react';
 import ConnectionDialog from './ConnectionDialog';
 import './ConnectionsPage.css';

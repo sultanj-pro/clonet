@@ -1,26 +1,25 @@
-
 import ConnectionsPage from './ConnectionsPage';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const JDBCSettingsForm: React.FC = () => {
+const AppDatabaseSettingsForm: React.FC = () => {
   const [form, setForm] = useState({
     host: '',
     port: '',
-    user: '',
+    username: '',
     password: '',
     database: 'app_data',
   });
 
   React.useEffect(() => {
-    // Load persisted JDBC config from backend
+    // Load persisted Application Database config from backend
     fetch('/api/jdbc')
       .then(res => res.json())
       .then(data => {
-        if (data.host && data.port && data.user && data.password && data.database) {
+        if (data.host && data.port && data.username && data.password && data.database) {
           setForm({
             host: data.host,
             port: data.port,
-            user: data.user,
+            username: data.username,
             password: data.password,
             database: data.database,
           });
@@ -59,12 +58,12 @@ const JDBCSettingsForm: React.FC = () => {
       });
       const data = await response.json();
       if (response.ok) {
-        setSuccess(data.message || 'JDBC settings saved and validated successfully!');
+        setSuccess(data.message || 'Application Database settings saved and validated successfully!');
         setStatus(`Configured for ${form.host}:${form.port}/${form.database}`);
         setConfigured(true);
         setEditMode(false);
       } else {
-        setError(data.error || 'Failed to save JDBC settings.');
+        setError(data.error || 'Failed to save Application Database settings.');
       }
     } catch (err) {
       let message = 'Unknown error';
@@ -84,39 +83,39 @@ const JDBCSettingsForm: React.FC = () => {
     return (
       <div className="jdbc-configured">
         <div className="app-db-status">
-          <strong>Current JDBC Storage:</strong> {status}
+          <strong>Current Application Database:</strong> {status}
         </div>
         <button type="button" className="edit-jdbc-btn" onClick={() => setEditMode(true)}>
-          Edit JDBC Settings
+          Edit Application Database Settings
         </button>
       </div>
     );
   }
   return (
-    <form className="jdbc-settings-form" onSubmit={e => e.preventDefault()}>
+    <form className="appdb-settings-form" onSubmit={e => e.preventDefault()}>
       <div className="form-row">
-        <label htmlFor="jdbc-host">Host/Server:</label>
-        <input type="text" id="jdbc-host" name="host" value={form.host} onChange={handleChange} placeholder="e.g. mysql, sqlserver, or IP" />
+        <label htmlFor="appdb-host">Host/Server:</label>
+        <input type="text" id="appdb-host" name="host" value={form.host} onChange={handleChange} placeholder="e.g. mysql, sqlserver, or IP" disabled={!editMode} />
       </div>
       <div className="form-row">
-        <label htmlFor="jdbc-port">Port:</label>
-        <input type="number" id="jdbc-port" name="port" value={form.port} onChange={handleChange} placeholder="e.g. 3306 or 1433" />
+        <label htmlFor="appdb-port">Port:</label>
+        <input type="number" id="appdb-port" name="port" value={form.port} onChange={handleChange} placeholder="e.g. 3306 or 1433" disabled={!editMode} />
       </div>
       <div className="form-row">
-        <label htmlFor="jdbc-user">User:</label>
-        <input type="text" id="jdbc-user" name="user" value={form.user} onChange={handleChange} placeholder="Database user" />
+        <label htmlFor="appdb-username">Username:</label>
+        <input type="text" id="appdb-username" name="username" value={form.username} onChange={handleChange} placeholder="Database username" disabled={!editMode} />
       </div>
       <div className="form-row">
-        <label htmlFor="jdbc-password">Password:</label>
-        <input type="password" id="jdbc-password" name="password" value={form.password} onChange={handleChange} placeholder="Database password" />
+        <label htmlFor="appdb-password">Password:</label>
+        <input type="password" id="appdb-password" name="password" value={form.password} onChange={handleChange} placeholder="Database password" disabled={!editMode} />
       </div>
       <div className="form-row">
-        <label htmlFor="jdbc-database">Database Name:</label>
-        <input type="text" id="jdbc-database" name="database" value={form.database} readOnly />
+        <label htmlFor="appdb-database">Database Name:</label>
+        <input type="text" id="appdb-database" name="database" value={form.database} readOnly />
       </div>
       <div className="form-actions">
         <button type="button" className="save-jdbc-btn" onClick={handleSave} disabled={loading}>
-          {loading ? 'Saving...' : 'Save JDBC Settings'}
+          {loading ? 'Saving...' : 'Save Application Database Settings'}
         </button>
         <button type="button" className="cancel-jdbc-btn" onClick={() => setEditMode(false)}>
           Cancel
@@ -125,7 +124,7 @@ const JDBCSettingsForm: React.FC = () => {
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
       <div className="app-db-info">
-        <p><strong>JDBC Storage:</strong> Use any JDBC-compatible database (e.g., MySQL, SQL Server). Enter the connection details above. The database will be created if it does not exist.</p>
+        <p><strong>Application Database:</strong> Use any JDBC-compatible database (e.g., MySQL, SQL Server). Enter the connection details above. The database will be created if it does not exist.</p>
       </div>
     </form>
   );
@@ -133,6 +132,14 @@ const JDBCSettingsForm: React.FC = () => {
 
 const ConfigurationPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'settings' | 'connections' | 'jobs'>('settings');
+  const [currentJdbcDatabase, setCurrentJdbcDatabase] = useState<string>('');
+
+  useEffect(() => {
+    fetch('/api/app-settings/current-jdbc')
+      .then(res => res.json())
+      .then(data => setCurrentJdbcDatabase(data.currentJdbcDatabase))
+      .catch(() => setCurrentJdbcDatabase(''));
+  }, []);
 
   return (
     <div className="configuration-page">
@@ -161,12 +168,14 @@ const ConfigurationPage: React.FC = () => {
       <div className="config-content">
         {activeTab === 'settings' && (
           <div>
-            <h3>Application Settings</h3>
-            <p>Manage global application settings here.</p>
+            <h3>Application Database Settings</h3>
+            <div>
+              <strong>Current Application Database:</strong> {currentJdbcDatabase || 'Not set'}
+            </div>
             <div className="app-db-settings">
               <h4>Application Database Settings</h4>
               <p>Configure JDBC storage for application data (settings, connections, jobs):</p>
-              <JDBCSettingsForm />
+              <AppDatabaseSettingsForm />
             </div>
           </div>
         )}

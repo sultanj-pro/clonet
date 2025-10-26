@@ -1,3 +1,26 @@
+const { ensureAppDatabase } = require('./utils/dbSetup');
+const mssql = require('mssql');
+const sqlConfig = {
+  user: process.env.DB_USER || 'sa',
+  password: process.env.DB_PASSWORD || 'Password123!',
+  server: process.env.DB_HOST || 'sqlserver',
+  port: parseInt(process.env.DB_PORT || '1433'),
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+  },
+};
+
+async function startupDbCheck() {
+  try {
+    const pool = await mssql.connect(sqlConfig);
+    await ensureAppDatabase(pool);
+    await pool.close();
+  } catch (err) {
+    console.error('Error ensuring clonet_app_db:', err);
+  }
+}
+startupDbCheck();
 const express = require('express');
 const { swaggerUi, swaggerSpec } = require('./swagger');
 const app = express();
@@ -6,13 +29,12 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
-// Import routes and services
-const userRoutes = require('./routes/users');
 // Note: Ensure that 'user' is consistently referred to as 'username' in the userRoutes
 const configRoutes = require('./routes/config');
 const cloneRoutes = require('./routes/clone');
 const jdbcConfigRoutes = require('./routes/jdbcConfig');
 const connectionsRoutes = require('./routes/connections');
+const appSettingsRoutes = require('./routes/appSettings');
 const { initializeService } = require('./services/serviceManager');
 
 // Middleware
@@ -29,7 +51,6 @@ app.use(cors({
   origin: true, // Allow all origins in development
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
 }));
 
 // Add pre-flight OPTIONS handling
@@ -40,11 +61,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/users', userRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/clone', cloneRoutes);
 app.use('/api/jdbc', jdbcConfigRoutes);
 app.use('/api/connections', connectionsRoutes);
+app.use('/api/app-settings', appSettingsRoutes);
+
+// Ensure clonet_app_db and app_settings table exist on server start
+const { ensureAppDatabaseAndSettingsTable } = require('./utils/dbSetup');
+
+// You may want to move these to a config file or environment variables
+const dbConfig = {
+  username: process.env.SQLSERVER_USERNAME || 'sa',
+  password: process.env.SQLSERVER_PASSWORD || 'Password123!',
+  server: process.env.SQLSERVER_HOST || 'clonet-sqlserver',
+  port: parseInt(process.env.SQLSERVER_PORT, 10) || 1433
+};
+
+ensureAppDatabaseAndSettingsTable(dbConfig)
+  .then(() => console.log('App database and settings table are ready.'))
+  .catch(err => console.error('Failed to ensure app database/tables:', err));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

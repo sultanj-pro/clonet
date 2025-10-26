@@ -39,5 +39,3 @@ main {
   padding: 20px;
 }
 
-/* Import our component styles */
-@import './components/UserList.css';

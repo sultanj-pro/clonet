@@ -13,7 +13,7 @@ const options = {
       { url: 'http://localhost:5000' }
     ],
   },
-  apis: ['./backend/routes/*.js', './backend/controllers/*.js'],
+  apis: [__dirname + '/routes/*.js'],
 };
 
 const swaggerSpec = swaggerJSDoc(options);

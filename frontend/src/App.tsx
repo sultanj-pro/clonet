@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-import UserList from './components/UserList';
 import ConfigurationPage from './components/ConfigurationPage';
 import ClonePage from './components/ClonePage';
 import './App.css';

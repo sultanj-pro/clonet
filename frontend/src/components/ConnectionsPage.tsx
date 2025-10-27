@@ -114,9 +114,8 @@ const ConnectionsPage: React.FC = () => {
             <th>Host</th>
             <th>Port</th>
             <th>Database</th>
-            <th>Username</th>
             <th>Actions</th>
-            <th>Test</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -127,7 +126,6 @@ const ConnectionsPage: React.FC = () => {
               <td>{conn.host}</td>
               <td>{conn.port}</td>
               <td>{conn.db_name || conn.database}</td>
-              <td>{conn.username}</td>
               <td>
                 <button onClick={() => handleEdit(idx)}>Edit</button>
                 <button onClick={() => handleDelete(idx)}>Delete</button>

@@ -254,19 +254,6 @@ const ClonePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Clone Button - Prominent placement */}
-      {sourceStatus.connected && destinationStatus.connected && sourceConfig?.table && (
-        <div className="clone-button-wrapper">
-          <button 
-            className="start-clone-button" 
-            onClick={startClone} 
-            disabled={cloneInProgress}
-          >
-            {cloneInProgress ? '⏳ Cloning in Progress...' : '▶ Start Clone Operation'}
-          </button>
-        </div>
-      )}
-
       {/* Merged Options Panel - Two Columns */}
       {sourceStatus.connected && destinationStatus.connected && (
         <div className="clone-options-panel">
@@ -307,13 +294,24 @@ const ClonePage: React.FC = () => {
             <h3>📊 Clone Status</h3>
             <p className="column-description">Monitor the cloning operation</p>
             
+            {sourceConfig?.table && (
+              <button 
+                className="start-clone-button" 
+                onClick={startClone} 
+                disabled={cloneInProgress}
+                style={{ width: '100%', marginBottom: '20px' }}
+              >
+                {cloneInProgress ? '⏳ Cloning in Progress...' : '▶ Start Clone Operation'}
+              </button>
+            )}
+            
             {cloneResult ? (
               <div className={`clone-result ${cloneResult.includes('❌') || cloneResult.includes('Error') ? 'error' : cloneResult.includes('✅') ? 'success' : ''}`}>
                 {cloneResult}
               </div>
             ) : (
               <div className="status-placeholder">
-                <p>Click "Start Clone Operation" to begin</p>
+                <p>Ready to clone</p>
               </div>
             )}
           </div>

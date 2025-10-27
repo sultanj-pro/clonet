@@ -17,7 +17,7 @@ services:
     depends_on:
       - backend
     networks:
-      - clonet-network
+      - network
 
   backend:
     container_name: clonet-backend
@@ -51,7 +51,7 @@ services:
       spark-service:
         condition: service_healthy
     networks:
-      - clonet-network
+      - network
 
   spark-service:
     container_name: clonet-spark-service
@@ -85,7 +85,7 @@ services:
       mysql:
         condition: service_healthy
     networks:
-      - clonet-network
+      - network
 
   mysql:
     container_name: clonet-mysql
@@ -106,7 +106,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clonet-network
+      - network
 
   sqlserver:
     container_name: clonet-sqlserver
@@ -127,10 +127,10 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - clonet-network
+      - network
 
 networks:
-  clonet-network:
+  network:
     driver: bridge
 
 volumes:

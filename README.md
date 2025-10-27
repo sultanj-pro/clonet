@@ -45,6 +45,7 @@ clonet/
 │   └── requirements.txt     # Python dependencies
 ├── database/                # Database initialization
 │   └── init.sql             # MySQL initialization script
+
 ├── docker-compose.yml       # Development orchestration
 └── README.md               # This file
 ```

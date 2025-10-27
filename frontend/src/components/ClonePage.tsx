@@ -254,72 +254,71 @@ const ClonePage: React.FC = () => {
         </div>
       </div>
 
-      {sourceStatus.connected && destinationStatus.connected && (
-        <div className="clone-options">
-          <h3>Clone Options</h3>
-          <div className="options-grid">
-            <div className="form-group">
-              <label htmlFor="clone-mode">Write Mode</label>
-              <select 
-                id="clone-mode" 
-                value={cloneOptions.mode} 
-                onChange={e => setCloneOptions({ ...cloneOptions, mode: e.target.value as any })}
-              >
-                <option value="overwrite">Overwrite (drop and recreate table)</option>
-                <option value="append">Append (add to existing data)</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="batch-size">Batch Size</label>
-              <input 
-                id="batch-size" 
-                type="number" 
-                value={cloneOptions.batchSize} 
-                onChange={e => setCloneOptions({ ...cloneOptions, batchSize: parseInt(e.target.value || '10000') })} 
-                min={1000} 
-                max={100000} 
-                step={1000} 
-              />
-              <small className="hint">Rows per batch (1,000 - 100,000)</small>
-            </div>
-          </div>
+      {/* Clone Button - Prominent placement */}
+      {sourceStatus.connected && destinationStatus.connected && sourceConfig?.table && (
+        <div className="clone-button-wrapper">
+          <button 
+            className="start-clone-button" 
+            onClick={startClone} 
+            disabled={cloneInProgress}
+          >
+            {cloneInProgress ? '⏳ Cloning in Progress...' : '▶ Start Clone Operation'}
+          </button>
         </div>
       )}
 
-      <div className="clone-actions">
-        <div className="config-summary">
-          <div className="summary-item">
-            <strong>Source:</strong>
-            {selectedSourceId && sourceConfig ? <span> {sourceConfig.host}:{sourceConfig.port}/{sourceConfig.database}</span> : <span> Not selected</span>}
-            {sourceConfig?.table && <div className="table-name">Table: {sourceConfig.table}</div>}
-            {sourceStatus.connected && <span className="status-badge connected">✓ Connected</span>}
+      {/* Merged Options Panel - Two Columns */}
+      {sourceStatus.connected && destinationStatus.connected && (
+        <div className="clone-options-panel">
+          <div className="options-column">
+            <h3>⚙️ Clone Options</h3>
+            <p className="column-description">Configure how data will be cloned</p>
+            
+            <div className="options-grid">
+              <div className="form-group">
+                <label htmlFor="clone-mode">Write Mode</label>
+                <select 
+                  id="clone-mode" 
+                  value={cloneOptions.mode} 
+                  onChange={e => setCloneOptions({ ...cloneOptions, mode: e.target.value as any })}
+                >
+                  <option value="overwrite">Overwrite (drop and recreate table)</option>
+                  <option value="append">Append (add to existing data)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="batch-size">Batch Size</label>
+                <input 
+                  id="batch-size" 
+                  type="number" 
+                  value={cloneOptions.batchSize} 
+                  onChange={e => setCloneOptions({ ...cloneOptions, batchSize: parseInt(e.target.value || '10000') })} 
+                  min={1000} 
+                  max={100000} 
+                  step={1000} 
+                />
+                <small className="hint">Rows per batch (1,000 - 100,000)</small>
+              </div>
+            </div>
           </div>
 
-          <div className="summary-arrow">→</div>
-
-          <div className="summary-item">
-            <strong>Destination:</strong>
-            {selectedDestId && destinationConfig ? <span> {destinationConfig.host}:{destinationConfig.port}/{destinationConfig.database}</span> : <span> Not selected</span>}
-            <div className="table-name">Table: {destinationConfig?.table || (sourceConfig?.table ? `${sourceConfig.table}_copy` : 'N/A')}</div>
-            {destinationStatus.connected && <span className="status-badge connected">✓ Connected</span>}
+          <div className="options-column" style={{ borderTopColor: '#17a2b8' }}>
+            <h3>📊 Clone Status</h3>
+            <p className="column-description">Monitor the cloning operation</p>
+            
+            {cloneResult ? (
+              <div className={`clone-result ${cloneResult.includes('❌') || cloneResult.includes('Error') ? 'error' : cloneResult.includes('✅') ? 'success' : ''}`}>
+                {cloneResult}
+              </div>
+            ) : (
+              <div className="status-placeholder">
+                <p>Click "Start Clone Operation" to begin</p>
+              </div>
+            )}
           </div>
         </div>
-
-        {cloneResult && (
-          <div className={`clone-result ${cloneResult.includes('❌') || cloneResult.includes('Error') ? 'error' : cloneResult.includes('✅') ? 'success' : ''}`}>
-            {cloneResult}
-          </div>
-        )}
-
-        <button 
-          className="start-clone-button" 
-          onClick={startClone} 
-          disabled={!sourceStatus.connected || !destinationStatus.connected || !sourceConfig?.table || cloneInProgress}
-        >
-          {cloneInProgress ? 'Cloning in Progress...' : 'Start Clone Operation'}
-        </button>
-      </div>
+      )}
     </div>
   );
 };

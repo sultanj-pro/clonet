@@ -1,35 +1,51 @@
-# Clonet
+# Clonet - Database Cloning Tool
 
-A modern full-stack web application built with React frontend, Node.js backend, and MySQL database, all containerized with Docker.
+A modern full-stack application for cloning data between databases using Apache Spark. Built with React frontend, Node.js backend, and Python Spark service, all containerized with Docker.
+
+## Features
+
+- **Database Connection Management**: Save and manage database connections (MySQL, SQL Server)
+- **Database Cloning**: Clone data from source to target databases with table selection
+- **Connection Testing**: Verify database credentials and connectivity before operations
+- **Spark-Powered**: Uses Apache Spark for efficient data transfer between databases
+- **Docker-Based**: Fully containerized for easy deployment and development
 
 ## Architecture
 
-- **Frontend**: React 18 with modern hooks and component architecture
-- **Backend**: Node.js with Express.js REST API and direct MySQL integration
-- **Database**: MySQL 8.0 with phpMyAdmin for database management
-- **Containerization**: Docker and Docker Compose for easy development and deployment
+- **Frontend**: React 18 with TypeScript
+- **Backend**: Node.js with Express.js REST API
+- **Spark Service**: Python Flask + PySpark for data operations
+- **Application Database**: MySQL 8.0 (stores connection configurations)
+- **Supported Target Databases**: MySQL, SQL Server
 
 ## Project Structure
 
 ```
 clonet/
 ├── frontend/                 # React frontend application
-│   ├── public/              # Static assets
-│   ├── src/                 # React source code
-│   ├── package.json         # Frontend dependencies
-│   ├── Dockerfile           # Production frontend container
-│   └── Dockerfile.dev       # Development frontend container
+│   ├── src/
+│   │   ├── components/      # React components (Clone, Connections, Config pages)
+│   │   ├── services/        # API client services
+│   │   └── types/           # TypeScript type definitions
+│   ├── Dockerfile.dev       # Development frontend container
+│   └── package.json         # Frontend dependencies
 ├── backend/                 # Node.js backend API
-│   ├── config/              # Configuration files
+│   ├── config/              # Database and service configuration
+│   ├── controllers/         # API controllers (clone, connections)
 │   ├── routes/              # API route handlers
-│   ├── package.json         # Backend dependencies
+│   ├── services/            # Business logic services
 │   ├── server.js            # Main server file
-│   ├── Dockerfile           # Production backend container
-│   └── Dockerfile.dev       # Development backend container
-├── database/                # Database scripts
-│   └── init.sql             # Database initialization script
-├── docker-compose.yml       # Development containers orchestration
-├── docker-compose.prod.yml  # Production containers orchestration
+│   ├── Dockerfile.dev       # Development backend container
+│   └── package.json         # Backend dependencies
+├── spark-service/           # Python Spark service
+│   ├── app.py               # Flask application
+│   ├── clone_service.py     # Spark cloning operations
+│   ├── database_connectors.py # JDBC connection builders
+│   ├── Dockerfile           # Spark service container
+│   └── requirements.txt     # Python dependencies
+├── database/                # Database initialization
+│   └── init.sql             # MySQL initialization script
+├── docker-compose.yml       # Development orchestration
 └── README.md               # This file
 ```
 
@@ -40,224 +56,240 @@ clonet/
 
 ## Quick Start
 
-### Development Environment
-
-1. **Clone and navigate to the project:**
-   ```bash
-   cd C:\source\clonet
-   ```
-
-2. **Start all services:**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Access the applications:**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-   - **API Documentation (Swagger)**: http://localhost:5000/api-docs
-   - Database Admin (phpMyAdmin): http://localhost:8080
-   - MySQL Database: localhost:3306
-
-4. **View logs:**
-   ```bash
-   # All services
-   docker-compose logs -f
-   
-   # Specific service
-   docker-compose logs -f frontend
-   docker-compose logs -f backend
-   docker-compose logs -f mysql
-   ```
-
-### Production Environment
-
-1. **Set up environment variables:**
-   ```bash
-   cp .env.prod.example .env.prod
-   # Edit .env.prod with your production values
-   ```
-
-2. **Deploy with production configuration:**
-   ```bash
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
-   ```
-
-## API Documentation
-
-### Interactive API Documentation (Swagger)
-
-The API includes comprehensive interactive documentation powered by Swagger/OpenAPI 3.0:
-
-- **URL**: http://localhost:5000/api-docs
-- **Features**:
-  - Interactive API testing interface
-  - Complete endpoint documentation
-  - Request/response schemas
-  - Authentication requirements
-  - Example requests and responses
-
-### API Endpoints
-
-### Health Check
-- `GET /api/health` - Backend health status
-- `GET /api/db-status` - Database connection status
-
-### Users Management
-- `GET /api/users` - Get all users (with optional pagination and search)
-- `GET /api/users/:id` - Get user by ID
-- `POST /api/users` - Create new user
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user
-
-### Example API Usage
+### 1. Start the Application
 
 ```bash
-# Get all users
-curl http://localhost:5000/api/users
+# Navigate to project directory
+cd C:\source\clonet
 
-# Get users with pagination
-curl "http://localhost:5000/api/users?page=1&pageSize=5"
+# Start all services
+docker-compose up -d
 
-# Search users
-curl "http://localhost:5000/api/users?search=john"
-
-# Create a new user
-curl -X POST http://localhost:5000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"name": "John Doe", "email": "john@example.com"}'
-
-# Update a user
-curl -X PUT http://localhost:5000/api/users/1 \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Jane Doe", "email": "jane@example.com"}'
-
-# Delete a user
-curl -X DELETE http://localhost:5000/api/users/1
-
-# Verify backend health
-curl http://localhost:5000/api/health
+# Check service status
+docker-compose ps
 ```
 
-**Note**: For easier API testing, use the interactive Swagger documentation at http://localhost:5000/api-docs
+### 2. Access the Application
 
-## Database
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:5000
+- **API Documentation (Swagger)**: http://localhost:5000/api-docs
+- **Spark Service**: http://localhost:4040 (internal)
 
-### Connection Details
-- **Host**: mysql (within Docker network) or localhost (from host machine)
-- **Port**: 3306
-- **Database**: clonet_db
-- **Root Password**: password (development) / configured (production)
+### 3. Using the Application
 
-### Initial Data
-The database is automatically initialized with sample users when first started.
+#### Add a Database Connection
 
-### Database Management
-Access phpMyAdmin at http://localhost:8080 to manage the database visually.
+1. Navigate to http://localhost:3000
+2. Go to **Configuration** → **Connections** tab
+3. Click **Add Connection**
+4. Fill in connection details:
+   - Name: `My MySQL DB`
+   - Type: `MySQL` or `SQL Server`
+   - Host: `mysql` (or external hostname)
+   - Port: `3306` (MySQL) or `1433` (SQL Server)
+   - Database: `database_name`
+   - Username: `username`
+   - Password: `password`
+5. Click **Test** to verify connection
+6. Click **Save** to store the connection
 
-## Development
+#### Clone Database Data
 
-### Frontend Development
-```bash
-# Install dependencies locally (optional, for IDE support)
-cd frontend
-npm install
+1. Go to **Clone** page
+2. **Source**: Select or configure source database connection
+3. Click **Fetch Tables** to see available tables
+4. Select tables to clone
+5. **Target**: Select or configure target database connection
+6. Click **Start Clone** to begin data transfer
+7. Monitor progress in real-time
 
-# The frontend auto-reloads when you make changes to files in ./frontend/src/
-```
-
-### Backend Development
-```bash
-# Install dependencies locally (optional, for IDE support)
-cd backend
-npm install
-
-# The backend auto-restarts when you make changes to files in ./backend/
-```
+## Configuration
 
 ### Environment Variables
 
-Create a `.env` file in the backend directory for local development:
+The backend uses environment variables configured in `backend/.env`:
 
 ```env
+# Server Configuration
 NODE_ENV=development
 PORT=5000
+
+# Application Database (MySQL - stores connections)
 DB_HOST=mysql
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=password
 DB_NAME=clonet_db
+
+# Spark Service
+SPARK_SERVICE_URL=http://spark-service:4040
 ```
 
-## Docker Commands
+## API Documentation
 
-### Useful Commands
+### Interactive API Documentation
+
+Access comprehensive API documentation at: http://localhost:5000/api-docs
+
+### Key API Endpoints
+
+#### Health & Status
+- `GET /api/health` - Backend health check
+
+#### Connections Management
+- `GET /api/connections` - List all saved connections
+- `POST /api/connections` - Create new connection
+- `PUT /api/connections/:id` - Update connection
+- `DELETE /api/connections/:id` - Delete connection
+- `POST /api/connections/test` - Test database connection
+
+#### Clone Operations
+- `POST /api/clone/test-connection` - Test source/target connection
+- `POST /api/clone/get-tables` - Fetch available tables from database
+- `POST /api/clone/get-schema` - Get table schema details
+- `POST /api/clone/start` - Start cloning operation
+- `GET /api/clone/status/:jobId` - Check clone job status
+
+## Development
+
+### View Logs
+
 ```bash
-# Start services
-docker-compose up -d
+# All services
+docker-compose logs -f
 
-# Stop services
-docker-compose down
+# Specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f spark-service
+```
 
-# Rebuild and start services
+### Restart Services
+
+```bash
+# Restart backend after code changes
+docker-compose restart backend
+
+# Restart all services
+docker-compose restart
+
+# Rebuild after dependency changes
 docker-compose up -d --build
+```
 
-# View running containers
+### Access Container Shell
+
+```bash
+# Backend
+docker-compose exec backend sh
+
+# Frontend
+docker-compose exec frontend sh
+
+# Spark Service
+docker-compose exec spark-service bash
+
+# MySQL
+docker-compose exec mysql mysql -u root -p
+```
+
+## Troubleshooting
+
+### Port Conflicts
+
+Make sure ports 3000, 5000, 3306, 1433, and 4040 are not in use:
+
+```bash
+# Windows PowerShell
+netstat -ano | findstr ":3000"
+netstat -ano | findstr ":5000"
+```
+
+### Connection Issues
+
+1. **Cannot connect to database**: Verify host, port, username, and password are correct
+2. **Test connection hangs**: Check if target database server is reachable
+3. **Clone fails**: Ensure both source and target databases are accessible
+
+### Container Issues
+
+```bash
+# Check container status
 docker-compose ps
 
-# Execute commands in containers
-docker-compose exec backend npm install package-name
-docker-compose exec frontend npm install package-name
+# Check container health
+docker inspect clonet-backend --format='{{.State.Health.Status}}'
 
-# Access container shell
-docker-compose exec backend sh
-docker-compose exec mysql mysql -u root -p
+# View detailed logs
+docker-compose logs backend --tail=50
 
-# Clean up everything (including volumes)
-docker-compose down -v
-docker system prune -a
+# Restart unhealthy containers
+docker-compose restart backend
 ```
 
-### Troubleshooting
+### Database Reset
 
-1. **Port conflicts**: Make sure ports 3000, 5000, 3306, and 8080 are not in use by other applications.
+```bash
+# Stop all services and remove volumes
+docker-compose down -v
 
-2. **Database connection issues**: Wait a few moments after starting for MySQL to fully initialize.
+# Restart fresh
+docker-compose up -d
+```
 
-3. **File changes not reflecting**: 
-   - For frontend: Make sure Docker has access to your filesystem
-   - For backend: Check that nodemon is working in the container logs
+## Technology Stack
 
-4. **Permission issues**: On Linux/Mac, you might need to adjust file permissions:
-   ```bash
-   sudo chown -R $USER:$USER .
-   ```
+### Frontend
+- React 18
+- TypeScript
+- CSS Modules
+- Fetch API
+
+### Backend
+- Node.js
+- Express.js
+- mysql2 (MySQL client)
+- Swagger/OpenAPI
+
+### Spark Service
+- Python 3.9
+- Flask
+- PySpark 3.5
+- JDBC drivers (MySQL, SQL Server)
+
+### Infrastructure
+- Docker
+- Docker Compose
+- MySQL 8.0
+- SQL Server 2022 (optional external)
 
 ## Security Considerations
 
 ### Development
-- Default passwords are used for convenience
-- All services are exposed on localhost
+- Default credentials are used for convenience
+- All services are exposed on localhost only
 
 ### Production
-- Change all default passwords in `.env.prod`
-- Use environment-specific configurations
-- Consider using Docker secrets for sensitive data
-- Implement proper authentication and authorization
-- Use HTTPS in production
-- Configure firewall rules appropriately
+- Change all default passwords
+- Use strong passwords for database connections
+- Store sensitive configuration in environment variables
+- Use Docker secrets for production deployments
+- Implement authentication and authorization
+- Use HTTPS/TLS for all connections
+- Restrict network access with firewall rules
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test locally with Docker
+4. Test thoroughly with Docker
 5. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## Support
 

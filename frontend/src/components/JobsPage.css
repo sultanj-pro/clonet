@@ -1,0 +1,25 @@
+.jobs-page {
+  /* No padding - main handles the border spacing */
+}
+
+.jobs-page h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.jobs-content {
+  background: white;
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.jobs-content h3 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.jobs-content p {
+  color: #666;
+  line-height: 1.6;
+}

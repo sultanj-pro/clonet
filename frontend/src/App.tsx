@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import HomePage from './components/HomePage';
 import ConfigurationPage from './components/ConfigurationPage';
+import JobsPage from './components/JobsPage';
 import ClonePage from './components/ClonePage';
 import './App.css';
 
@@ -19,10 +21,16 @@ const App: React.FC = () => {
               Home
             </NavLink>
             <NavLink 
-              to="/configuration" 
+              to="/connections" 
               className={({ isActive }) => `nav-button ${isActive ? 'active' : ''}`}
             >
-              Configuration
+              Connections
+            </NavLink>
+            <NavLink 
+              to="/jobs" 
+              className={({ isActive }) => `nav-button ${isActive ? 'active' : ''}`}
+            >
+              Jobs
             </NavLink>
             <NavLink 
               to="/clone" 
@@ -34,13 +42,9 @@ const App: React.FC = () => {
         </header>
         <main>
           <Routes>
-            <Route path="/" element={
-              <div>
-                <h2>Job Status Dashboard</h2>
-                <p>View all jobs ran and running here.</p>
-              </div>
-            } />
-            <Route path="/configuration/*" element={<ConfigurationPage />} />
+            <Route path="/" element={<HomePage />} />
+            <Route path="/connections" element={<ConfigurationPage />} />
+            <Route path="/jobs" element={<JobsPage />} />
             <Route path="/clone" element={<ClonePage />} />
           </Routes>
         </main>

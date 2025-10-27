@@ -1,10 +1,11 @@
 .connections-page-container {
-  padding: 24px;
+  /* No padding - main handles the border spacing */
 }
 
 .connections-form-container {
   margin-bottom: 24px;
 }
+
 .connections-table {
   width: 100%;
   border-collapse: collapse;

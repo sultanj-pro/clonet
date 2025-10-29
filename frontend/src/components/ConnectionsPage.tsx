@@ -2,7 +2,7 @@
 // ANALYSIS: Add Connection logic is handled below. Reviewing for error source.
 // TODO: Review the Add Connection logic here for troubleshooting the 'Failed to add connection' error.
 import React, { useState, useEffect } from 'react';
-import ConnectionDialog from './ConnectionDialog';
+// import ConnectionDialog from './ConnectionDialog'; // Disabled - ConnectionsPage will be deprecated in favor of dashboard
 import './ConnectionsPage.css';
 import { DatabaseConfig, DatabaseType, testConnection } from '../services/cloneApi';
 import { getConnections, addConnection, updateConnection, deleteConnection } from '../services/connectionsApi';
@@ -157,6 +157,7 @@ const ConnectionsPage: React.FC = () => {
           ))}
         </tbody>
       </table>
+      {/* Temporarily disabled - ConnectionDialog API changed for dashboard-centric design
       {showAddDialog && (
         <ConnectionDialog
           open={showAddDialog}
@@ -193,6 +194,7 @@ const ConnectionsPage: React.FC = () => {
           }}
         />
       )}
+      */}
     </div>
   );
 

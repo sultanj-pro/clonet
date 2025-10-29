@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { getConnections, ConnectionConfig } from '../services/connectionsApi';
+import React, { useState } from 'react';
+import { getConnections, getTablesForConnection, ConnectionConfig } from '../services/connectionsApi';
+import ConnectionDialog from './ConnectionDialog';
 import './JobWizard.css';
 
 interface JobWizardProps {
@@ -39,10 +40,6 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    loadConnections();
-  }, []);
-
   const loadConnections = async () => {
     try {
       setLoadingConnections(true);
@@ -57,15 +54,14 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
   };
 
   const fetchTables = async (connectionId: string) => {
-    // TODO: Implement actual API call to fetch tables
     setLoadingTables(true);
     try {
-      // Mock data for now - replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setAvailableTables(['users', 'orders', 'products', 'customers', 'transactions']);
+      const tables = await getTablesForConnection(parseInt(connectionId));
+      setAvailableTables(tables);
     } catch (error) {
       console.error('Failed to fetch tables:', error);
       setErrors({ tables: 'Failed to fetch tables. Please try again.' });
+      setAvailableTables([]);
     } finally {
       setLoadingTables(false);
     }
@@ -73,16 +69,37 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      const nextStep = currentStep + 1;
+      
+      // Load connections when entering step 2 (Source) or step 4 (Destination)
+      if (nextStep === 2 || nextStep === 4) {
+        loadConnections();
+      }
+      
+      // Fetch tables when moving from step 2 to step 3
       if (currentStep === 2 && jobData.sourceConnectionId && availableTables.length === 0) {
         fetchTables(jobData.sourceConnectionId);
       }
-      setCurrentStep(currentStep + 1);
+      
+      setCurrentStep(nextStep);
     }
   };
 
   const handleBack = () => {
     setCurrentStep(currentStep - 1);
     setErrors({});
+  };
+
+  const handleConnectionCreated = (newConnection: ConnectionConfig) => {
+    loadConnections(); // Reload connections list
+    setShowConnectionDialog(false); // Close the dialog
+    
+    // Auto-select the newly created connection based on current step
+    if (currentStep === 2) {
+      setJobData({ ...jobData, sourceConnectionId: newConnection.id?.toString() || '' });
+    } else if (currentStep === 4) {
+      setJobData({ ...jobData, destinationConnectionId: newConnection.id?.toString() || '' });
+    }
   };
 
   const validateStep = (step: number): boolean => {
@@ -108,9 +125,6 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
         if (!jobData.destinationConnectionId) {
           newErrors.destinationConnection = 'Please select a destination connection';
         }
-
-
-
         break;
     }
 
@@ -316,7 +330,6 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
   );
 
   const renderStep5 = () => (
-
     <div className="wizard-step">
       <h3>Clone Options</h3>
       <p className="step-description">Configure how the data should be cloned</p>
@@ -423,63 +436,71 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
   );
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="wizard-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="wizard-header">
-          <h2>Create Clone Job</h2>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
+    <>
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="wizard-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="wizard-header">
+            <h2>Create Clone Job</h2>
+            <button className="close-button" onClick={onClose}>×</button>
+          </div>
 
-        {renderStepIndicator()}
+          {renderStepIndicator()}
 
-        <div className="wizard-body">
-          {currentStep === 1 && renderStep1()}
-          {currentStep === 2 && renderStep2()}
-          {currentStep === 3 && renderStep3()}
-          {currentStep === 4 && renderStep4()}
-          {currentStep === 5 && renderStep5()}
-          {currentStep === 6 && renderStep6()}
-        </div>
+          <div className="wizard-body">
+            {currentStep === 1 && renderStep1()}
+            {currentStep === 2 && renderStep2()}
+            {currentStep === 3 && renderStep3()}
+            {currentStep === 4 && renderStep4()}
+            {currentStep === 5 && renderStep5()}
+            {currentStep === 6 && renderStep6()}
+          </div>
 
-        <div className="wizard-footer">
-          <button 
-            className="btn-secondary" 
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          
-          <div className="footer-actions">
-            {currentStep > 1 && (
-              <button 
-                className="btn-secondary" 
-                onClick={handleBack}
-              >
-                Back
-              </button>
-            )}
+          <div className="wizard-footer">
+            <button 
+              className="btn-secondary" 
+              onClick={onClose}
+            >
+              Cancel
+            </button>
             
-            {currentStep < 6 ? (
-              <button 
-                className="btn-primary" 
-                onClick={handleNext}
-              >
-                Next
-              </button>
-            ) : (
-              <button 
-                className="btn-primary" 
-                onClick={handleSubmit}
-              >
-                Create Job
-              </button>
-            )}
+            <div className="footer-actions">
+              {currentStep > 1 && (
+                <button 
+                  className="btn-secondary" 
+                  onClick={handleBack}
+                >
+                  Back
+                </button>
+              )}
+              
+              {currentStep < 6 ? (
+                <button 
+                  className="btn-primary" 
+                  onClick={handleNext}
+                >
+                  Next
+                </button>
+              ) : (
+                <button 
+                  className="btn-primary" 
+                  onClick={handleSubmit}
+                >
+                  Create Job
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {showConnectionDialog && (
+        <ConnectionDialog
+          onClose={() => setShowConnectionDialog(false)}
+          onSuccess={handleConnectionCreated}
+        />
+      )}
+    </>
   );
 };
 
 export default JobWizard;
-

@@ -66,3 +66,17 @@ export const testConnection = async (config: Omit<ConnectionConfig, 'id' | 'name
   
   return data;
 };
+export const getTablesForConnection = async (connectionId: number): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/connections/${connectionId}/tables`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch tables');
+  }
+  
+  const data = await response.json();
+  return data.tables || [];
+};

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { addConnection, testConnection, ConnectionConfig } from '../services/connectionsApi';
 import { DatabaseType } from '../services/cloneApi';
-
+import './ConnectionDialog.css';
 interface ConnectionDialogProps {
   onClose: () => void;
   onSuccess: (connection: ConnectionConfig) => void;
@@ -112,8 +112,8 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ onClose, onSuccess 
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="connection-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="connection-dialog">
         <div className="dialog-header">
           <h2>Add New Connection</h2>
           <button className="close-button" onClick={onClose}>×</button>
@@ -141,8 +141,8 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ onClose, onSuccess 
                 value={formData.type}
                 onChange={(e) => handleTypeChange(e.target.value)}
               >
-                <option value="MySQL">MySQL</option>
-                <option value="SQL Server">SQL Server</option>
+                <option value="mysql">MySQL</option>
+                <option value="sqlserver">SQL Server</option>
               </select>
             </div>
           </div>

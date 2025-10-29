@@ -124,3 +124,49 @@ exports.deleteConnection = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete connection', error: error.message });
   }
 };
+// Get tables for a connection
+exports.getTables = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = mysql.createPool(dbConfig);
+    const [rows] = await pool.query('SELECT * FROM connections WHERE id=?', [id]);
+    await pool.end();
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    const connection = rows[0];
+    
+    // Forward request to Spark service to get tables
+    const response = await fetch(`${SPARK_SERVICE_URL}/clone/test-connection`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: connection.type.toLowerCase().replace(/\s+/g, ''),
+        host: connection.host,
+        port: connection.port,
+        database: connection.db_name,
+        username: connection.username,
+        password: connection.password,
+        instanceName: connection.instance_name
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        success: false,
+        message: data.message || 'Failed to fetch tables'
+      });
+    }
+
+    res.json({ tables: data.tables || [] });
+  } catch (error) {
+    console.error('Error fetching tables:', error);
+    res.status(500).json({ message: 'Failed to fetch tables', error: error.message });
+  }
+};

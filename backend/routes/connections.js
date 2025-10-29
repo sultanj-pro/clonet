@@ -157,4 +157,22 @@ router.put('/:id', connectionsController.updateConnection);
  */
 router.delete('/:id', connectionsController.deleteConnection);
 
+/**
+ * @swagger
+ * /api/connections/{id}/tables:
+ *   get:
+ *     tags: [Connections]
+ *     summary: Get tables for a connection
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of tables
+ */
+router.get('/:id/tables', connectionsController.getTables);
+
 module.exports = router;

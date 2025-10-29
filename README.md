@@ -1,11 +1,17 @@
 # Clonet - Database Cloning Tool
 
-A modern full-stack application for cloning data between databases using Apache Spark. Built with React frontend, Node.js backend, and Python Spark service, all containerized with Docker.
+A modern full-stack application for managing database cloning jobs using Apache Spark. Built with React frontend, Node.js backend, and Python Spark service, all containerized with Docker.
+
+## Repository
+
+**GitHub**: [sultanj-pro/clonet](https://github.com/sultanj-pro/clonet)
 
 ## Features
 
+- **Job Dashboard**: Centralized dashboard for monitoring all clone jobs and their status
 - **Database Connection Management**: Save and manage database connections (MySQL, SQL Server)
 - **Database Cloning**: Clone data from source to target databases with table selection
+- **Job Scheduling**: Create, configure, and schedule clone operations
 - **Connection Testing**: Verify database credentials and connectivity before operations
 - **Spark-Powered**: Uses Apache Spark for efficient data transfer between databases
 - **Docker-Based**: Fully containerized for easy deployment and development
@@ -45,7 +51,6 @@ clonet/
 │   └── requirements.txt     # Python dependencies
 ├── database/                # Database initialization
 │   └── init.sql             # MySQL initialization script
-
 ├── docker-compose.yml       # Development orchestration
 └── README.md               # This file
 ```
@@ -79,10 +84,10 @@ docker-compose ps
 
 ### 3. Using the Application
 
-#### Add a Database Connection
+#### Managing Database Connections
 
 1. Navigate to http://localhost:3000
-2. Go to **Configuration** → **Connections** tab
+2. Go to **Connections** page
 3. Click **Add Connection**
 4. Fill in connection details:
    - Name: `My MySQL DB`
@@ -95,15 +100,22 @@ docker-compose ps
 5. Click **Test** to verify connection
 6. Click **Save** to store the connection
 
-#### Clone Database Data
+#### Creating a Clone Job
 
 1. Go to **Clone** page
-2. **Source**: Select or configure source database connection
+2. **Source Connection**: Select from saved connections
 3. Click **Fetch Tables** to see available tables
 4. Select tables to clone
-5. **Target**: Select or configure target database connection
-6. Click **Start Clone** to begin data transfer
-7. Monitor progress in real-time
+5. **Destination Connection**: Select from saved connections
+6. Configure clone options (write mode, batch size)
+7. Click **Start Clone Operation** to begin data transfer
+8. Monitor progress in the Clone Status panel
+
+#### Monitoring Jobs
+
+1. Go to **Jobs** page to see all scheduled and historical clone jobs
+2. View job status, execution time, and results
+3. Re-run or modify existing jobs as needed
 
 ## Configuration
 
@@ -282,11 +294,17 @@ docker-compose up -d
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly with Docker
-5. Submit a pull request
+1. Create a feature branch from `master`
+2. Make your changes
+3. Test thoroughly with Docker
+4. Commit with descriptive messages
+5. Push to GitHub and create a pull request
+
+## Repository Information
+
+- **Main Branch**: `master`
+- **Development Workflow**: Feature branches → Pull Request → Master
+- **Repository**: https://github.com/sultanj-pro/clonet
 
 ## License
 

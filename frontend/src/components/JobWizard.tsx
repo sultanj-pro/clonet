@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getConnections, getTablesForConnection, ConnectionConfig } from '../services/connectionsApi';
+import { testRunJob } from '../services/jobsApi';
 import ConnectionDialog from './ConnectionDialog';
 import './JobWizard.css';
 
@@ -39,6 +40,8 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isTestingJob, setIsTestingJob] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; result?: any } | null>(null);
 
   const loadConnections = async () => {
     try {
@@ -136,6 +139,32 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
     if (validateStep(currentStep)) {
       onSubmit(jobData);
       onClose();
+    }
+  };
+
+  const handleTestRun = async () => {
+    try {
+      setIsTestingJob(true);
+      setTestResult(null);
+      
+      const result = await testRunJob({
+        name: jobData.name,
+        description: jobData.description,
+        source_connection_id: parseInt(jobData.sourceConnectionId),
+        destination_connection_id: parseInt(jobData.destinationConnectionId),
+        tables: jobData.sourceTables,
+        write_mode: jobData.writeMode,
+        batch_size: jobData.batchSize
+      });
+      
+      setTestResult(result);
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Test run failed'
+      });
+    } finally {
+      setIsTestingJob(false);
     }
   };
 
@@ -432,6 +461,20 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
           <span>{jobData.scheduleType === 'now' ? 'Run immediately' : 'Scheduled'}</span>
         </div>
       </div>
+
+      {testResult && (
+        <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+          <div className="test-result-header">
+            {testResult.success ? '✓ Test Run Successful' : '✗ Test Run Failed'}
+          </div>
+          <div className="test-result-message">{testResult.message}</div>
+          {testResult.result && (
+            <div className="test-result-details">
+              <pre>{JSON.stringify(testResult.result, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -481,12 +524,22 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
                   Next
                 </button>
               ) : (
-                <button 
-                  className="btn-primary" 
-                  onClick={handleSubmit}
-                >
-                  Create Job
-                </button>
+                <>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={handleTestRun}
+                    disabled={isTestingJob}
+                  >
+                    {isTestingJob ? 'Testing...' : '🚀 Test Run'}
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    onClick={handleSubmit}
+                    disabled={isTestingJob}
+                  >
+                    Create Job
+                  </button>
+                </>
               )}
             </div>
           </div>

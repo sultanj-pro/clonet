@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getConnections, getTablesForConnection, ConnectionConfig } from '../services/connectionsApi';
+import { getConnections, getTablesForConnection, testConnectionById, ConnectionConfig } from '../services/connectionsApi';
 import { testRunJob } from '../services/jobsApi';
 import ConnectionDialog from './ConnectionDialog';
 import './JobWizard.css';
@@ -42,6 +42,10 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isTestingJob, setIsTestingJob] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; result?: any } | null>(null);
+  
+  // Connection testing state
+  const [testingConnectionId, setTestingConnectionId] = useState<string | null>(null);
+  const [connectionTestResult, setConnectionTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const loadConnections = async () => {
     try {
@@ -59,7 +63,9 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
   const fetchTables = async (connectionId: string) => {
     setLoadingTables(true);
     try {
+      console.log('Fetching tables for connection:', connectionId);
       const tables = await getTablesForConnection(parseInt(connectionId));
+      console.log('Tables received:', tables);
       setAvailableTables(tables);
     } catch (error) {
       console.error('Failed to fetch tables:', error);
@@ -67,6 +73,28 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
       setAvailableTables([]);
     } finally {
       setLoadingTables(false);
+    }
+  };
+
+  const handleTestConnection = async (connectionId: string, isSourceConnection: boolean) => {
+    setTestingConnectionId(connectionId);
+    setConnectionTestResult(null);
+    
+    try {
+      const result = await testConnectionById(parseInt(connectionId));
+      setConnectionTestResult(result);
+      
+      // If test is successful, auto-fetch tables
+      if (result.success) {
+        fetchTables(connectionId);
+      }
+    } catch (error) {
+      setConnectionTestResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Test failed'
+      });
+    } finally {
+      setTestingConnectionId(null);
     }
   };
 
@@ -79,10 +107,8 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
         loadConnections();
       }
       
-      // Fetch tables when moving from step 2 to step 3
-      if (currentStep === 2 && jobData.sourceConnectionId && availableTables.length === 0) {
-        fetchTables(jobData.sourceConnectionId);
-      }
+      // Clear test result when moving between steps
+      setConnectionTestResult(null);
       
       setCurrentStep(nextStep);
     }
@@ -249,20 +275,42 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
         <>
           <div className="form-group">
             <label htmlFor="sourceConnection">Source Connection *</label>
-            <select
-              id="sourceConnection"
-              value={jobData.sourceConnectionId}
-              onChange={(e) => setJobData({ ...jobData, sourceConnectionId: e.target.value })}
-              className={errors.sourceConnection ? 'error' : ''}
-            >
-              <option value="">-- Select a connection --</option>
-              {connections.map(conn => (
-                <option key={conn.id} value={conn.id?.toString() || ''}>
-                  {conn.name} ({conn.type} - {conn.host}:{conn.port})
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <select
+                id="sourceConnection"
+                value={jobData.sourceConnectionId}
+                onChange={(e) => {
+                  setJobData({ ...jobData, sourceConnectionId: e.target.value });
+                  setConnectionTestResult(null);
+                }}
+                className={errors.sourceConnection ? 'error' : ''}
+                style={{ flex: 1 }}
+              >
+                <option value="">-- Select a connection --</option>
+                {connections.map(conn => (
+                  <option key={conn.id} value={conn.id?.toString() || ''}>
+                    {conn.name} ({conn.type} - {conn.host}:{conn.port})
+                  </option>
+                ))}
+              </select>
+              <button
+                className="add-connection-btn secondary"
+                onClick={() => handleTestConnection(jobData.sourceConnectionId, true)}
+                disabled={!jobData.sourceConnectionId || testingConnectionId === jobData.sourceConnectionId}
+                style={{ whiteSpace: 'nowrap', marginTop: '5px' }}
+              >
+                {testingConnectionId === jobData.sourceConnectionId ? 'Testing...' : 'Test Connection'}
+              </button>
+            </div>
             {errors.sourceConnection && <span className="error-message">{errors.sourceConnection}</span>}
+            {connectionTestResult && (
+              <div style={{ marginTop: '10px' }} className={`test-result ${connectionTestResult.success ? 'success' : 'error'}`}>
+                <div className="test-result-header">
+                  {connectionTestResult.success ? '✓ Connection Successful' : '✗ Connection Failed'}
+                </div>
+                <div className="test-result-message">{connectionTestResult.message}</div>
+              </div>
+            )}
           </div>
 
           <button className="add-connection-btn secondary" onClick={() => setShowConnectionDialog(true)}>
@@ -289,7 +337,7 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
               <label>
                 <input
                   type="checkbox"
-                  checked={jobData.sourceTables.length === availableTables.length}
+                  checked={jobData.sourceTables.length === availableTables.length && availableTables.length > 0}
                   onChange={(e) => setJobData({
                     ...jobData,
                     sourceTables: e.target.checked ? [...availableTables] : []
@@ -322,7 +370,6 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
     </div>
   );
 
-
   const renderStep4 = () => (
     <div className="wizard-step">
       <h3>Select Destination Connection</h3>
@@ -334,20 +381,42 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
         <>
           <div className="form-group">
             <label htmlFor="destConnection">Destination Connection *</label>
-            <select
-              id="destConnection"
-              value={jobData.destinationConnectionId}
-              onChange={(e) => setJobData({ ...jobData, destinationConnectionId: e.target.value })}
-              className={errors.destinationConnection ? 'error' : ''}
-            >
-              <option value="">-- Select a connection --</option>
-              {connections.map(conn => (
-                <option key={conn.id} value={conn.id?.toString() || ''}>
-                  {conn.name} ({conn.type} - {conn.host}:{conn.port})
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <select
+                id="destConnection"
+                value={jobData.destinationConnectionId}
+                onChange={(e) => {
+                  setJobData({ ...jobData, destinationConnectionId: e.target.value });
+                  setConnectionTestResult(null);
+                }}
+                className={errors.destinationConnection ? 'error' : ''}
+                style={{ flex: 1 }}
+              >
+                <option value="">-- Select a connection --</option>
+                {connections.map(conn => (
+                  <option key={conn.id} value={conn.id?.toString() || ''}>
+                    {conn.name} ({conn.type} - {conn.host}:{conn.port})
+                  </option>
+                ))}
+              </select>
+              <button
+                className="add-connection-btn secondary"
+                onClick={() => handleTestConnection(jobData.destinationConnectionId, false)}
+                disabled={!jobData.destinationConnectionId || testingConnectionId === jobData.destinationConnectionId}
+                style={{ whiteSpace: 'nowrap', marginTop: '5px' }}
+              >
+                {testingConnectionId === jobData.destinationConnectionId ? 'Testing...' : 'Test Connection'}
+              </button>
+            </div>
             {errors.destinationConnection && <span className="error-message">{errors.destinationConnection}</span>}
+            {connectionTestResult && (
+              <div style={{ marginTop: '10px' }} className={`test-result ${connectionTestResult.success ? 'success' : 'error'}`}>
+                <div className="test-result-header">
+                  {connectionTestResult.success ? '✓ Connection Successful' : '✗ Connection Failed'}
+                </div>
+                <div className="test-result-message">{connectionTestResult.message}</div>
+              </div>
+            )}
           </div>
 
           <button className="add-connection-btn secondary" onClick={() => setShowConnectionDialog(true)}>

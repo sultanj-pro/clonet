@@ -17,7 +17,7 @@ export interface Job extends JobData {
 }
 
 export const createJob = async (jobData: JobData): Promise<Job> => {
-  const response = await fetch(`${API_BASE_URL}/api/jobs`, {
+  const response = await fetch(`${API_BASE_URL}/jobs`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -33,7 +33,7 @@ export const createJob = async (jobData: JobData): Promise<Job> => {
 };
 
 export const getJobs = async (): Promise<Job[]> => {
-  const response = await fetch(`${API_BASE_URL}/api/jobs`);
+  const response = await fetch(`${API_BASE_URL}/jobs`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch jobs');
@@ -43,7 +43,7 @@ export const getJobs = async (): Promise<Job[]> => {
 };
 
 export const getJobById = async (id: number): Promise<Job> => {
-  const response = await fetch(`${API_BASE_URL}/api/jobs/${id}`);
+  const response = await fetch(`${API_BASE_URL}/jobs/${id}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch job');
@@ -53,7 +53,7 @@ export const getJobById = async (id: number): Promise<Job> => {
 };
 
 export const deleteJob = async (id: number): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/api/jobs/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/jobs/${id}`, {
     method: 'DELETE',
   });
 
@@ -63,7 +63,7 @@ export const deleteJob = async (id: number): Promise<void> => {
 };
 
 export const testRunJob = async (jobData: JobData): Promise<{ success: boolean; message: string; result?: any }> => {
-  const response = await fetch(`${API_BASE_URL}/api/jobs/test-run`, {
+  const response = await fetch(`${API_BASE_URL}/jobs/test-run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -79,7 +79,7 @@ export const testRunJob = async (jobData: JobData): Promise<{ success: boolean; 
 };
 
 export const runJob = async (id: number): Promise<{ success: boolean; message: string; result?: any }> => {
-  const response = await fetch(`${API_BASE_URL}/api/jobs/${id}/run`, {
+  const response = await fetch(`${API_BASE_URL}/jobs/${id}/run`, {
     method: 'POST',
   });
 

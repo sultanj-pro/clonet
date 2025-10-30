@@ -79,6 +79,80 @@ exports.testConnection = async (req, res) => {
   }
 };
 
+// Test a connection by ID
+exports.testConnectionById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = mysql.createPool(dbConfig);
+    const [rows] = await pool.query('SELECT * FROM connections WHERE id=?', [id]);
+    await pool.end();
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    const connection = rows[0];
+    
+    // Forward request to Spark service to test the connection
+    const response = await fetch(`${SPARK_SERVICE_URL}/clone/test-connection`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: connection.type.toLowerCase().replace(/\s+/g, ''),
+        host: connection.host,
+        port: connection.port,
+        database: connection.db_name,
+        username: connection.username,
+        password: connection.password,
+        instanceName: connection.instance_name
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Connection test failed:', data);
+      
+      // Extract user-friendly error message
+      let userMessage = 'Connection failed';
+      if (data.message) {
+        const errorMsg = data.message;
+        if (errorMsg.includes('Access denied')) {
+          userMessage = 'Access denied - please check username and password';
+        } else if (errorMsg.includes('Communications link failure') || errorMsg.includes('Connection refused')) {
+          userMessage = 'Cannot reach database server - please check host and port';
+        } else if (errorMsg.includes('Unknown database')) {
+          userMessage = 'Database does not exist';
+        } else if (errorMsg.includes('java.sql.SQLException:')) {
+          const match = errorMsg.match(/java\.sql\.SQLException:\s*([^\n]+)/);
+          userMessage = match ? match[1].trim() : 'Connection failed';
+        } else {
+          const firstLine = errorMsg.split('\n')[0];
+          userMessage = firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+        }
+      }
+      
+      return res.status(response.status).json({
+        success: false,
+        message: userMessage
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Connection successful'
+    });
+  } catch (error) {
+    console.error('Error testing connection:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to test connection - please check your connection settings'
+    });
+  }
+};
+
 // Add a new connection
 exports.addConnection = async (req, res) => {
   const { name, host, port, username, password, database, type } = req.body;

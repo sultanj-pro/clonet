@@ -66,6 +66,18 @@ export const testConnection = async (config: Omit<ConnectionConfig, 'id' | 'name
   
   return data;
 };
+
+export const testConnectionById = async (connectionId: number): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/connections/${connectionId}/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  
+  const data = await response.json();
+  return data;
+};
+
 export const getTablesForConnection = async (connectionId: number): Promise<string[]> => {
   const response = await fetch(`${API_BASE_URL}/connections/${connectionId}/tables`, {
     method: 'GET',

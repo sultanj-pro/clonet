@@ -83,6 +83,24 @@ router.post('/test', connectionsController.testConnection);
 
 /**
  * @swagger
+ * /api/connections/{id}/test:
+ *   post:
+ *     tags: [Connections]
+ *     summary: Test a saved connection by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Connection test result
+ */
+router.post('/:id/test', connectionsController.testConnectionById);
+
+/**
+ * @swagger
  * /api/connections:
  *   post:
  *     tags: [Connections]

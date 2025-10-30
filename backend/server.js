@@ -9,6 +9,7 @@ const { swaggerUi, swaggerSpec } = require('./swagger');
 const cloneRoutes = require('./routes/clone');
 const connectionsRoutes = require('./routes/connections');
 const { initializeService } = require('./services/serviceManager');
+const jobsRoutes = require('./routes/jobs');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/clone', cloneRoutes);
 app.use('/api/connections', connectionsRoutes);
+app.use('/api/jobs', jobsRoutes);
 
 // Health
 app.get('/api/health', (req, res) => {

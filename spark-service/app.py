@@ -15,7 +15,8 @@ from clone_service import (
     get_table_schema,
     clone_data,
     store_job_status,
-    get_job_status
+    get_job_status,
+    validate_clone_job
 )
 from database_connectors import get_supported_databases
 
@@ -453,6 +454,38 @@ def clone_status(job_id):
         
     except Exception as e:
         logger.error(f"Error in /clone/status endpoint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/clone/dry-run', methods=['POST'])
+def dry_run_validation():
+    """Validate a clone job in read-only mode without writing to destination"""
+    try:
+        if spark is None:
+            return jsonify({'success': False, 'message': 'SparkSession not initialized'}), 503
+        
+        data = request.get_json()
+        source = data.get('source')
+        destination = data.get('destination')
+        tables = data.get('tables', [])
+        sample_size = data.get('sampleSize', 1000)
+        
+        # Validate required fields
+        if not source or not destination or not tables:
+            return jsonify({'success': False, 'message': 'Missing required fields: source, destination, tables'}), 400
+        
+        if not isinstance(tables, list) or len(tables) == 0:
+            return jsonify({'success': False, 'message': 'tables must be a non-empty array'}), 400
+        
+        logger.info(f"Validating clone job - tables: {tables}, sample size: {sample_size}")
+        
+        result = validate_clone_job(spark, source, destination, tables, sample_size)
+        
+        status_code = 200 if result['success'] else 400
+        return jsonify(result), status_code
+        
+    except Exception as e:
+        logger.error(f"Error in /clone/dry-run endpoint: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 

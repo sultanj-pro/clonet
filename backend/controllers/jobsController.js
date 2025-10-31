@@ -105,7 +105,7 @@ module.exports = {
             // Forward test to Spark service
             const SPARK_SERVICE_URL = process.env.SPARK_SERVICE_URL || 'http://spark-service:8000';
             
-            const response = await fetch(`${SPARK_SERVICE_URL}/clone/validate-clone`, {
+            const response = await fetch(`${SPARK_SERVICE_URL}/clone/dry-run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(jobData)

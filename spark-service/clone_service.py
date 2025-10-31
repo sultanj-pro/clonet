@@ -233,6 +233,216 @@ def clone_data(spark, source, destination, options):
 clone_jobs = {}
 
 
+def validate_clone_job(spark, source, destination, tables, sample_size=1000):
+    """
+    Validate a clone job by checking if source tables exist, destination tables are compatible,
+    and schemas match. This is a read-only operation that doesn't write any data.
+    
+    Args:
+        spark: SparkSession object
+        source: Source database config {host, port, database, username, password, type}
+        destination: Destination database config {host, port, database, username, password, type}
+        tables: List of table names to validate
+        sample_size: Number of rows to sample from source for validation
+    
+    Returns:
+        {
+            'success': bool,
+            'validation': [
+                {
+                    'table': str,
+                    'sourceExists': bool,
+                    'destExists': bool,
+                    'sourceRowSampleCount': int,
+                    'schemaMatch': bool,
+                    'sourceSchema': [{'name': str, 'type': str}],
+                    'destSchema': [{'name': str, 'type': str}],
+                    'warnings': [str],
+                    'error': str or None
+                }
+            ],
+            'overall': {
+                'success': bool,
+                'totalEstimatedRows': int,
+                'warnings': [str]
+            }
+        }
+    """
+    from database_connectors import build_jdbc_url, get_jdbc_driver, get_connection_properties
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    validation_results = []
+    overall_warnings = []
+    total_estimated_rows = 0
+    overall_success = True
+    
+    try:
+        source_type = source.get('type', 'mysql')
+        dest_type = destination.get('type', 'mysql')
+        
+        logger.info(f"Starting validation for {len(tables)} tables from {source_type} to {dest_type}")
+        
+        for table_name in tables:
+            table_result = {
+                'table': table_name,
+                'sourceExists': False,
+                'destExists': False,
+                'sourceRowSampleCount': 0,
+                'schemaMatch': False,
+                'sourceSchema': [],
+                'destSchema': [],
+                'warnings': [],
+                'error': None
+            }
+            
+            try:
+                # Check source table exists and get schema
+                source_jdbc_url = build_jdbc_url(source_type, source)
+                source_driver = get_jdbc_driver(source_type)
+                source_props = get_connection_properties(source)
+                
+                source_check_query = f"SELECT * FROM {table_name} LIMIT 0"
+                try:
+                    source_df = spark.read.format("jdbc") \
+                        .option("url", source_jdbc_url) \
+                        .option("query", source_check_query) \
+                        .option("driver", source_driver) \
+                        .options(**source_props) \
+                        .load()
+                    
+                    table_result['sourceExists'] = True
+                    source_schema = source_df.schema
+                    table_result['sourceSchema'] = [
+                        {'name': field.name, 'type': str(field.dataType)}
+                        for field in source_schema.fields
+                    ]
+                    logger.info(f"Source table '{table_name}' found with {len(source_schema.fields)} columns")
+                    
+                    # Get row count from source
+                    count_query = f"SELECT COUNT(*) as cnt FROM {table_name}"
+                    count_df = spark.read.format("jdbc") \
+                        .option("url", source_jdbc_url) \
+                        .option("query", count_query) \
+                        .option("driver", source_driver) \
+                        .options(**source_props) \
+                        .load()
+                    
+                    row_count = count_df.collect()[0][0]
+                    table_result['sourceRowSampleCount'] = min(row_count, sample_size)
+                    total_estimated_rows += row_count
+                    logger.info(f"Source table '{table_name}' has {row_count} rows")
+                    
+                except Exception as e:
+                    table_result['error'] = f"Cannot read source table: {str(e)}"
+                    table_result['sourceExists'] = False
+                    overall_success = False
+                    logger.error(f"Error reading source table '{table_name}': {str(e)}")
+                
+                # Check destination table exists and get schema
+                if table_result['sourceExists']:
+                    dest_jdbc_url = build_jdbc_url(dest_type, destination)
+                    dest_driver = get_jdbc_driver(dest_type)
+                    dest_props = get_connection_properties(destination)
+                    
+                    dest_check_query = f"SELECT * FROM {table_name} LIMIT 0"
+                    try:
+                        dest_df = spark.read.format("jdbc") \
+                            .option("url", dest_jdbc_url) \
+                            .option("query", dest_check_query) \
+                            .option("driver", dest_driver) \
+                            .options(**dest_props) \
+                            .load()
+                        
+                        table_result['destExists'] = True
+                        dest_schema = dest_df.schema
+                        table_result['destSchema'] = [
+                            {'name': field.name, 'type': str(field.dataType)}
+                            for field in dest_schema.fields
+                        ]
+                        logger.info(f"Destination table '{table_name}' found with {len(dest_schema.fields)} columns")
+                        
+                        # Compare schemas
+                        source_cols = {f.name.lower(): str(f.dataType) for f in source_schema.fields}
+                        dest_cols = {f.name.lower(): str(f.dataType) for f in dest_schema.fields}
+                        
+                        # Check for missing columns
+                        missing_in_dest = set(source_cols.keys()) - set(dest_cols.keys())
+                        extra_in_dest = set(dest_cols.keys()) - set(source_cols.keys())
+                        
+                        if missing_in_dest:
+                            table_result['warnings'].append(
+                                f"Destination missing columns: {', '.join(sorted(missing_in_dest))}"
+                            )
+                            overall_success = False
+                        
+                        if extra_in_dest:
+                            table_result['warnings'].append(
+                                f"Destination has extra columns: {', '.join(sorted(extra_in_dest))}"
+                            )
+                        
+                        # Check for type mismatches
+                        type_mismatches = []
+                        for col in source_cols.keys():
+                            if col in dest_cols and source_cols[col] != dest_cols[col]:
+                                type_mismatches.append(
+                                    f"{col}: {source_cols[col]} -> {dest_cols[col]}"
+                                )
+                        
+                        if type_mismatches:
+                            table_result['warnings'].append(
+                                f"Type mismatches: {', '.join(type_mismatches)}"
+                            )
+                            overall_success = False
+                        
+                        # Schema matches if no missing columns and no type mismatches
+                        table_result['schemaMatch'] = len(missing_in_dest) == 0 and len(type_mismatches) == 0
+                        
+                        logger.info(f"Schema comparison for '{table_name}': match={table_result['schemaMatch']}")
+                        
+                    except Exception as e:
+                        table_result['warnings'].append(
+                            f"Destination table not found or not readable: {str(e)}"
+                        )
+                        table_result['destExists'] = False
+                        logger.warning(f"Destination table '{table_name}' issue: {str(e)}")
+                
+            except Exception as e:
+                table_result['error'] = str(e)
+                overall_success = False
+                logger.error(f"Validation error for table '{table_name}': {str(e)}")
+            
+            # Collect warnings
+            if table_result['warnings']:
+                overall_warnings.extend(table_result['warnings'])
+            
+            validation_results.append(table_result)
+        
+        logger.info(f"Validation complete: success={overall_success}, warnings={len(overall_warnings)}")
+        
+        return {
+            'success': overall_success,
+            'validation': validation_results,
+            'overall': {
+                'success': overall_success,
+                'totalEstimatedRows': total_estimated_rows,
+                'warnings': overall_warnings
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Fatal error in validate_clone_job: {str(e)}")
+        return {
+            'success': False,
+            'validation': [],
+            'overall': {
+                'success': False,
+                'totalEstimatedRows': 0,
+                'warnings': [str(e)]
+            }
+        }
+
+
 def store_job_status(job_id, status):
     """Store job status in memory"""
     clone_jobs[job_id] = status

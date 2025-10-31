@@ -93,6 +93,15 @@ exports.testConnectionById = async (req, res) => {
 
     const connection = rows[0];
     
+    // Validate database type before sending to Spark
+    const validTypes = ['mysql', 'sqlserver'];
+    if (!validTypes.includes(connection.type)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid connection type: '${connection.type}'. Must be exactly 'mysql' or 'sqlserver' (lowercase, no spaces).`
+      });
+    }
+    
     // Forward request to Spark service to test the connection
     const response = await fetch(`${SPARK_SERVICE_URL}/clone/test-connection`, {
       method: 'POST',
@@ -100,7 +109,7 @@ exports.testConnectionById = async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        type: connection.type.toLowerCase().replace(/\s+/g, ''),
+        type: connection.type,
         host: connection.host,
         port: connection.port,
         database: connection.db_name,
@@ -212,6 +221,15 @@ exports.getTables = async (req, res) => {
 
     const connection = rows[0];
     
+    // Validate database type before sending to Spark
+    const validTypes = ['mysql', 'sqlserver'];
+    if (!validTypes.includes(connection.type)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid connection type: '${connection.type}'. Must be exactly 'mysql' or 'sqlserver' (lowercase, no spaces).`
+      });
+    }
+    
     // Forward request to Spark service to get tables
     const response = await fetch(`${SPARK_SERVICE_URL}/clone/test-connection`, {
       method: 'POST',
@@ -219,7 +237,7 @@ exports.getTables = async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        type: connection.type.toLowerCase().replace(/\s+/g, ''),
+        type: connection.type,
         host: connection.host,
         port: connection.port,
         database: connection.db_name,

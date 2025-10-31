@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getConnections, getTablesForConnection, testConnectionById, ConnectionConfig } from '../services/connectionsApi';
 import { testRunJob } from '../services/jobsApi';
 import ConnectionDialog from './ConnectionDialog';
+import ValidationResults from './ValidationResults';
 import './JobWizard.css';
 
 interface JobWizardProps {
@@ -41,11 +42,13 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isTestingJob, setIsTestingJob] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string; result?: any } | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; data?: any; result?: any } | null>(null);
   
   // Connection testing state
   const [testingConnectionId, setTestingConnectionId] = useState<string | null>(null);
   const [connectionTestResult, setConnectionTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [sourceConnectionTested, setSourceConnectionTested] = useState<boolean>(false);
+  const [destinationConnectionTested, setDestinationConnectionTested] = useState<boolean>(false);
 
   const loadConnections = async () => {
     try {
@@ -84,15 +87,33 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
       const result = await testConnectionById(parseInt(connectionId));
       setConnectionTestResult(result);
       
-      // If test is successful, auto-fetch tables
+      // Track successful test for the appropriate connection
       if (result.success) {
+        if (isSourceConnection) {
+          setSourceConnectionTested(true);
+        } else {
+          setDestinationConnectionTested(true);
+        }
         fetchTables(connectionId);
+      } else {
+        // Clear test status on failure
+        if (isSourceConnection) {
+          setSourceConnectionTested(false);
+        } else {
+          setDestinationConnectionTested(false);
+        }
       }
     } catch (error) {
       setConnectionTestResult({
         success: false,
         message: error instanceof Error ? error.message : 'Test failed'
       });
+      // Clear test status on error
+      if (isSourceConnection) {
+        setSourceConnectionTested(false);
+      } else {
+        setDestinationConnectionTested(false);
+      }
     } finally {
       setTestingConnectionId(null);
     }
@@ -143,6 +164,8 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
       case 2:
         if (!jobData.sourceConnectionId) {
           newErrors.sourceConnection = 'Please select a source connection';
+        } else if (!sourceConnectionTested) {
+          newErrors.sourceConnection = 'Please test the source connection before proceeding';
         }
         break;
       case 3:
@@ -153,6 +176,8 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
       case 4:
         if (!jobData.destinationConnectionId) {
           newErrors.destinationConnection = 'Please select a destination connection';
+        } else if (!destinationConnectionTested) {
+          newErrors.destinationConnection = 'Please test the destination connection before proceeding';
         }
         break;
     }
@@ -173,7 +198,7 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
       setIsTestingJob(true);
       setTestResult(null);
       
-      const result = await testRunJob({
+      const response = await testRunJob({
         name: jobData.name,
         description: jobData.description,
         source_connection_id: parseInt(jobData.sourceConnectionId),
@@ -183,7 +208,13 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
         batch_size: jobData.batchSize
       });
       
-      setTestResult(result);
+      // Map result to data for ValidationResults component
+      setTestResult({
+        success: response.success,
+        message: response.message,
+        data: response.result,
+        result: response.result
+      });
     } catch (error) {
       setTestResult({
         success: false,
@@ -282,6 +313,7 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
                 onChange={(e) => {
                   setJobData({ ...jobData, sourceConnectionId: e.target.value });
                   setConnectionTestResult(null);
+                  setSourceConnectionTested(false);
                 }}
                 className={errors.sourceConnection ? 'error' : ''}
                 style={{ flex: 1 }}
@@ -388,6 +420,7 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
                 onChange={(e) => {
                   setJobData({ ...jobData, destinationConnectionId: e.target.value });
                   setConnectionTestResult(null);
+                  setDestinationConnectionTested(false);
                 }}
                 className={errors.destinationConnection ? 'error' : ''}
                 style={{ flex: 1 }}
@@ -485,6 +518,34 @@ const JobWizard: React.FC<JobWizardProps> = ({ onClose, onSubmit }) => {
             <span>Schedule for later (coming soon)</span>
           </label>
         </div>
+      </div>
+
+      <div className="form-group test-run-section">
+        <label>Validation (Optional)</label>
+        <p className="help-text">Run a test to validate the configuration before creating the job</p>
+        <button 
+          className="btn-secondary test-button"
+          onClick={handleTestRun}
+          disabled={isTestingJob}
+        >
+          {isTestingJob ? '⏳ Running Validation...' : '🔍 Run Validation'}
+        </button>
+        
+        {testResult && testResult.data && (
+          <ValidationResults 
+            data={testResult.data}
+            isLoading={isTestingJob}
+          />
+        )}
+
+        {testResult && !testResult.data && (
+          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+            <div className="test-result-header">
+              {testResult.success ? '✓ Validation Successful' : '✗ Validation Failed'}
+            </div>
+            <div className="test-result-message">{testResult.message}</div>
+          </div>
+        )}
       </div>
     </div>
   );
